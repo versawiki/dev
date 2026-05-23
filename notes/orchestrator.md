@@ -2,6 +2,27 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — M1-MCP-05 rebased + PR #22 opened)
+
+**Picked:** M1-MCP-05 (per-tenant opt-out flag API + persistence) — topmost item in the overnight safe list.
+
+**Situation on arrival:** `origin/vw-agent/M1-MCP-05-rebased` already had a complete M1-MCP-05 implementation (`5e5aedf`) but had diverged 3 commits behind current `origin/main` (merge base `61ac45c`). Previous ticks (9–13) detected pending PRs and stopped without pushing new work. No `gh` CLI available to inspect PR status directly.
+
+**What I did:** Verified the pending implementation was sound (cherry-picked cleanly, zero conflicts because the diverged commits on main touched `checkers/numeric.py`, `checkers/pii.py`, and `services/api/` — none overlap with the M1-MCP-05 files). Created `vw-agent/M1-MCP-05-r2` based on current `origin/main`, cherry-picked `5e5aedf`, ran tests, pushed, opened PR.
+
+**Test result:** meta-mcp **193 passed, 1 skipped** (spaCy model absent in sandbox — unchanged constant). Previous baseline was 171. Delta: **+22 new tests** in `test_opt_out_store.py`.
+
+**Files changed (net new vs main):**
+- `services/meta-mcp/src/versawiki_meta_mcp/opt_out/__init__.py` — new package; exports `TenantOptOutStore` + `load_tenant_config`
+- `services/meta-mcp/src/versawiki_meta_mcp/opt_out/store.py` — async JSON-backed flag store; atomic writes via temp-file + `os.replace()`; lazy `asyncio.Lock`; graceful corrupt-file handling; `load_tenant_config()` factory
+- `services/meta-mcp/tests/test_opt_out_store.py` — 22 tests (default state, set/persist/reload, toggle, multi-tenant independence, `all_opted_out()`, `load_tenant_config()`, file-not-created-until-write, privacy invariant, corrupt-file handling, concurrent writes)
+- `services/meta-mcp/src/versawiki_meta_mcp/collector/signatures.py` — removes stale `_clamp01()` call (redundant since M1-MCP-01a-fix)
+- `services/meta-mcp/tests/conftest.py` + `test_compute_signatures.py` — use realistic branching factors > 1 now that the checker correctly accepts them
+
+**PR:** https://github.com/versawiki/dev/pull/22
+
+**Note for Josh:** PRs #5, #7, #16, #19 from earlier ticks may still be open. PR #22 is the clean rebased version for M1-MCP-05. Josh should close the stale M1-MCP-05 branches (#5/#7/#16/#19 if any belong to this ticket) and merge #22.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
