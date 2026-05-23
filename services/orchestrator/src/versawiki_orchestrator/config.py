@@ -113,6 +113,17 @@ class Settings(BaseSettings):
     price_haiku_output_per_mtok: float = 4.0
 
 
+    # ------------------------------------------------------------------
+    # Auto-merge (OPS-04 follow-up)
+    # ------------------------------------------------------------------
+    # When enabled, the orchestrator polls its own open PRs and merges
+    # them when all checks pass and they're within size/scope caps.
+    auto_merge_enabled: bool = True
+    auto_merge_poll_seconds: int = 60
+    auto_merge_max_files: int = 15
+    auto_merge_max_lines: int = 500
+
+
 def load_settings() -> Settings:
     """Construct a Settings instance from the current process env."""
     return Settings()
