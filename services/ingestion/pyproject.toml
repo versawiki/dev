@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "versawiki-ingestion"
+version = "0.1.0"
+description = "Versawiki ingestion service: connectors, parsers, ontology seeds."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Versawiki team" }]
+
+# Runtime dependencies are pinned to the versions locked in
+# docs/architecture/stack.md and DECISIONS.md (2026-05-22 stack lock).
+# Minor-version flexibility is allowed; major-version moves require
+# a new DECISIONS.md entry.
+dependencies = [
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.4,<3",
+    "structlog>=24.4,<26",
+    "anyio>=4.4,<5",
+    "pyyaml>=6.0,<7",
+    "openpyxl>=3.1,<4",
+    # MIME sniff — magika is a pure-pip install (no native libmagic); python-magic
+    # is the fallback when libmagic is available system-wide.
+    "magika>=0.5,<1",
+    "python-magic>=0.4,<1",
+    # Email parsing — extract-msg handles Outlook .msg; stdlib `email` handles .eml.
+    "extract-msg>=0.50,<1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+]
+dev = [
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

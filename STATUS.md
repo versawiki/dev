@@ -4,21 +4,21 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Current milestone
 
-**M1 — Local-folder ingestion (headless).** M0 fully closed. FastAPI skeleton landed. DomainObservation contract locked. Prior code audited file-by-file.
+**M1 — Local-folder ingestion (headless).** Three services standing up in parallel. 108 tests across all three. Privacy boundary enforced by code (not just docs).
 
-## Last session summary (2026-05-22, continuing)
+## Last session summary (2026-05-22, Wave 3)
 
-**Wave 2 (3 parallel specialists) returned and integrated:**
+**Wave 3 (3 parallel specialists, 2 finishers) returned and integrated:**
 
-- **Architect** wrote `docs/architecture/domain-observation-v1.md` (561 lines, 8 payload variants, discriminated union, all `frozen=True`, no free-form strings, numerics-as-buckets). Surfaced 5 open questions; Orchestrator accepted all 5 of his recommendations (reversible inside v1.x).
-- **Researcher** updated `docs/research/prior-art.md` with file-by-file audit of `C:\Users\joshu\Downloads\project-mcp-server` (27 files: 3 REUSE / 11 ADAPT / 13 REPLACE). Big surprise: prior MCPs are vector-RAG in name only — `embedding BYTEA` column never written, `sentence-transformers` commented out, search is pure `ILIKE`. Recorded as its own decision/observation in DECISIONS.md.
-- **Backend** built `services/api/` (FastAPI skeleton, OpenAPI export, 8/8 tests passing). Locked downstream patterns: error envelope, structlog-on-stderr, settings_dep, auth dep seam.
+- **Backend (M1-BE-02)** — API-key auth middleware. `services/api/src/versawiki_api/auth/` with `keys.py`, `hashing.py`, `middleware.py`. Admin routes: `POST /v1/admin/tenants/{tid}/api-keys`, `GET /...` (never returns raw token), `DELETE /v1/admin/api-keys/{kid}`. Token format `vw_<prefix>_<secret>` with hex alphabet (no `_` ambiguity). Argon2id hashing with stdlib scrypt fallback. 27/27 tests passing.
+- **Ingestion (M1-ING-01)** — `services/ingestion/` with `Connector` Protocol, `LocalFolderConnector`, 3 lifted parsers (base/email/excel), parser registry, AEC starter taxonomy YAML. 40/40 tests passing.
+- **Meta-MCP (M1-MCP-01a)** — `services/meta-mcp/` with 5-stage privacy checker pipeline (schema-validate → forbidden-field → PII/regex → numeric → quote → opt-out), `TenantAuditLog` JSONL writer that NEVER persists the offending payload, full Pydantic v2 DomainObservation implementation. 41 pass / 1 skip (spaCy missing) / 1 xfail (non-privacy bug in numeric.py — `branching_factor_p50/p95` capped at [0,1] though spec allows >1).
 
-**Repo is now at:** github.com/versawiki/dev (will push after this commit).
+**Bug fixed inline this session:** `secrets.token_urlsafe()` includes `_` in its alphabet, making the on-wire token `vw_<prefix>_<secret>` ambiguous to split. All 4 BE-02 test failures cascaded from this. Switched to `secrets.token_hex()`. `parse_token` also now enforces min-length on prefix/secret.
 
 ## In flight
 
-- (none — about to spawn Wave 3)
+- (none — about to spawn Wave 4)
 
 ## Blockers awaiting Josh
 
@@ -26,11 +26,11 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Next intended action (this session)
 
-**Wave 3 — three more parallel specialists:**
+**Wave 4 — three more parallel specialists:**
 
-1. **Backend** — `M1-BE-02` API-key auth middleware. Drops into the dep seam BE-01 already left.
-2. **Ingestion** — `M1-ING-01` Connector interface + local-folder connector. Lifts 3 parser files from the prior repo per the M0-06 audit.
-3. **MCP-builder** — `M1-MCP-01a` Privacy static checkers. Implements the 5-stage pipeline specified in `domain-observation-v1.md` §5.
+1. **Backend** — `M1-BE-03` Tenant schema provisioner. `CREATE SCHEMA vw_<slug>`, per-tenant Postgres role, Alembic per-schema migration runner.
+2. **Ingestion** — `M1-ING-02` Chunker + embedder pipeline. **NET-NEW** per M0-06 audit. RQ worker, idempotent on content hash, OpenAI `text-embedding-3-large@1024` provider, pluggable `EmbeddingProvider`.
+3. **MCP-builder** — `M1-MCP-02` Signature collector. Subscribes to ingestion events, computes signatures per the 8 payload variants, runs through M1-MCP-01a checkers, writes to meta-store.
 
 ## Quick links
 
@@ -44,5 +44,7 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 - `docs/architecture/v1.md` — v1 system design
 - `docs/architecture/domain-observation-v1.md` — meta-MCP wire contract
 - `docs/research/*` — landscape, ontology, prior-art (now includes M0-06 real audit)
-- `services/api/` — FastAPI skeleton (BE-01)
+- `services/api/` — FastAPI + API-key auth (BE-01, BE-02)
+- `services/ingestion/` — connector + parsers (ING-01)
+- `services/meta-mcp/` — privacy checker pipeline + audit log (MCP-01a)
 - `notes/*` — per-role working logs

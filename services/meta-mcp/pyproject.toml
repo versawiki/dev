@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "versawiki-meta-mcp"
+version = "0.1.0"
+description = "Versawiki meta-MCP — pre-emit privacy static checkers + signature collector."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Versawiki team" }]
+
+# Runtime dependencies. Versions follow services/api/pyproject.toml style.
+# Privacy-load-bearing libs (pydantic, regex, spacy) are pinned tightly.
+dependencies = [
+    "pydantic>=2.9,<3",
+    "structlog>=24.4,<26",
+    "regex>=2024.0",
+    "spacy>=3.7,<4",
+]
+
+[project.optional-dependencies]
+# presidio is an additive PII layer; if it can't be installed in a sandbox
+# the regex+spacy fallback covers the load-bearing checks. Kept optional
+# so the core wheel builds without it.
+pii = [
+    "presidio-analyzer>=2.2,<3",
+]
+test = [
+    "pytest>=8.0,<10",
+]
+dev = [
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

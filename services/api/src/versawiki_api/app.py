@@ -12,18 +12,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __service_name__, __version__
+from .auth.keys import ApiKeyStore, InMemoryApiKeyStore, RedisCachedApiKeyStore
+from .auth.middleware import set_api_key_store
 from .config import Settings, get_settings
 from .errors import install_error_handlers
 from .logging import configure_logging, get_logger
 from .routers import register_routers
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    api_key_store: ApiKeyStore | None = None,
+) -> FastAPI:
     """Build a fully wired FastAPI app.
 
     Args:
         settings: Override for tests. In normal runtime the cached
             ``get_settings()`` instance is used.
+        api_key_store: Override for tests. Defaults to an in-memory
+            store wrapped in the Redis-cache wrapper (the Redis client
+            stays a stub until BE-02b lands). BE-03 will swap in the
+            Postgres-backed store.
     """
     settings = settings or get_settings()
     configure_logging(settings)
@@ -45,6 +55,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.service_name = __service_name__
     app.state.service_version = __version__
+
+    # Each app instance gets its own store unless one is injected. The
+    # default is an in-memory store wrapped in the Redis-cache wrapper
+    # whose Redis client remains a stub for M1-BE-02; BE-03 replaces
+    # the inner store with the Postgres-backed implementation.
+    if api_key_store is None:
+        api_key_store = RedisCachedApiKeyStore(InMemoryApiKeyStore())
+    set_api_key_store(app, api_key_store)
 
     app.add_middleware(
         CORSMiddleware,

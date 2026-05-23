@@ -1,0 +1,517 @@
+# ============================================================================
+# AEC STARTER TAXONOMY
+# ============================================================================
+# Lifted from project-mcp-server/config/document_types.yaml per M0-06 audit
+# and the 2026-05-22 "AEC starter taxonomy" decision in DECISIONS.md.
+#
+# Versawiki's data model is unified (single `documents` table + JSONB extras),
+# not table-per-doc-type. This file is consumed by the schema provisioner
+# (M1-BE-03) to seed `ontology_nodes` for new AEC tenants and to populate the
+# `fields_hints` JSONB blob on each node — the classifier (M1-ING-03) uses
+# those hints during structured extraction.
+#
+# Top-level layout:
+#   document_types:    one entry per starter ontology node
+#     <type_key>:
+#       display_name:      human-readable label
+#       description:       one-line summary
+#       file_patterns:     filename globs (legacy detector hint, now demoted)
+#       fields_hints:      JSONB blob — name -> {type, required?, values?, item_type?, description?}
+#       relationships:     name -> {target, cardinality?, description?}
+#   common_fields:     attached to every document regardless of type
+#   settings:          taxonomy-level config
+# ============================================================================
+
+document_types:
+
+  # ---------------------------------------------------------------------------
+  # CONTRACTS & AGREEMENTS
+  # ---------------------------------------------------------------------------
+  contract:
+    display_name: "Contract / Agreement"
+    description: "Formal agreements, contracts, amendments, task orders"
+    file_patterns:
+      - "*contract*"
+      - "*agreement*"
+      - "*amendment*"
+      - "*task_order*"
+      - "*TO_*"
+    fields_hints:
+      contract_number:
+        type: text
+        required: true
+        description: "Unique contract identifier"
+      title:
+        type: text
+        required: true
+      parties:
+        type: list
+        item_type: text
+        description: "Organizations or individuals party to the contract"
+      effective_date:
+        type: date
+      expiration_date:
+        type: date
+      contract_value:
+        type: number
+        description: "Total contract value in dollars"
+      contract_type:
+        type: enum
+        values: [prime, subcontract, task_order, amendment, supplement, purchase_order]
+      scope_summary:
+        type: text
+        description: "Brief description of contracted scope"
+      status:
+        type: enum
+        values: [draft, active, completed, terminated, expired]
+    relationships:
+      parent_contract:
+        target: contract
+        description: "Parent contract for amendments/task orders"
+      related_specs:
+        target: specification
+        cardinality: many
+        description: "Specifications governing this contract"
+
+  # ---------------------------------------------------------------------------
+  # SPECIFICATIONS
+  # ---------------------------------------------------------------------------
+  specification:
+    display_name: "Specification"
+    description: "Technical specifications, standards, requirements documents"
+    file_patterns:
+      - "*spec*"
+      - "*specification*"
+      - "*standard*"
+      - "*requirements*"
+    fields_hints:
+      spec_number:
+        type: text
+        required: true
+        description: "Specification section or document number"
+      title:
+        type: text
+        required: true
+      revision:
+        type: text
+        description: "Revision number or letter"
+      revision_date:
+        type: date
+      discipline:
+        type: enum
+        values: [civil, structural, mechanical, electrical, plumbing, fire_protection,
+                 architectural, geotechnical, environmental, instrumentation, process,
+                 general, other]
+      spec_type:
+        type: enum
+        values: [performance, prescriptive, reference, proprietary]
+      status:
+        type: enum
+        values: [draft, issued_for_review, issued_for_construction, superseded, void]
+    relationships:
+      supersedes:
+        target: specification
+        description: "Previous version this spec replaces"
+      referenced_by:
+        target: contract
+        cardinality: many
+
+  # ---------------------------------------------------------------------------
+  # CORRESPONDENCE
+  # ---------------------------------------------------------------------------
+  letter:
+    display_name: "Letter / Transmittal"
+    description: "Formal letters, transmittals, notices"
+    file_patterns:
+      - "*letter*"
+      - "*transmittal*"
+      - "*notice*"
+      - "*correspondence*"
+    fields_hints:
+      reference_number:
+        type: text
+        description: "Letter or transmittal reference number"
+      date:
+        type: date
+        required: true
+      from_party:
+        type: text
+        required: true
+      to_party:
+        type: text
+        required: true
+      subject:
+        type: text
+        required: true
+      letter_type:
+        type: enum
+        values: [transmittal, notice, response, request, directive, general]
+      action_required:
+        type: text
+        description: "Action items or response required"
+      response_due_date:
+        type: date
+    relationships:
+      responds_to:
+        target: letter
+        description: "Letter this is responding to"
+      related_contract:
+        target: contract
+      attachments:
+        target: any
+        cardinality: many
+        description: "Documents attached to or transmitted with this letter"
+
+  email:
+    display_name: "Email"
+    description: "Email correspondence"
+    file_patterns:
+      - "*.eml"
+      - "*.msg"
+    fields_hints:
+      date:
+        type: date
+        required: true
+      from_address:
+        type: text
+        required: true
+      to_addresses:
+        type: list
+        item_type: text
+      cc_addresses:
+        type: list
+        item_type: text
+      subject:
+        type: text
+        required: true
+      thread_id:
+        type: text
+        description: "Email thread/conversation identifier"
+      has_attachments:
+        type: enum
+        values: ["true", "false"]
+    relationships:
+      reply_to:
+        target: email
+        description: "Email this replies to"
+      attachments:
+        target: any
+        cardinality: many
+
+  meeting_minutes:
+    display_name: "Meeting Minutes"
+    description: "Meeting notes, minutes, action item logs"
+    file_patterns:
+      - "*meeting*"
+      - "*minutes*"
+      - "*mom_*"
+    fields_hints:
+      meeting_date:
+        type: date
+        required: true
+      title:
+        type: text
+        required: true
+      location:
+        type: text
+      attendees:
+        type: list
+        item_type: text
+      meeting_type:
+        type: enum
+        values: [kickoff, progress, design_review, safety, coordination, closeout, other]
+      action_items:
+        type: list
+        item_type: text
+        description: "List of action items with assignees"
+      decisions_made:
+        type: list
+        item_type: text
+      next_meeting_date:
+        type: date
+    relationships:
+      related_contract:
+        target: contract
+      previous_meeting:
+        target: meeting_minutes
+
+  # ---------------------------------------------------------------------------
+  # REQUESTS & SUBMITTALS
+  # ---------------------------------------------------------------------------
+  rfi:
+    display_name: "Request for Information (RFI)"
+    description: "Formal requests for information or clarification"
+    file_patterns:
+      - "*rfi*"
+      - "*request_for_info*"
+    fields_hints:
+      rfi_number:
+        type: text
+        required: true
+      title:
+        type: text
+        required: true
+      date_submitted:
+        type: date
+        required: true
+      submitted_by:
+        type: text
+      assigned_to:
+        type: text
+      discipline:
+        type: enum
+        values: [civil, structural, mechanical, electrical, plumbing, fire_protection,
+                 architectural, geotechnical, environmental, instrumentation, process,
+                 general, other]
+      question:
+        type: text
+        required: true
+        description: "The actual question or request"
+      response:
+        type: text
+        description: "The answer provided"
+      date_response_due:
+        type: date
+      date_responded:
+        type: date
+      status:
+        type: enum
+        values: [draft, submitted, under_review, responded, closed, void]
+      cost_impact:
+        type: enum
+        values: [none, potential, confirmed]
+      schedule_impact:
+        type: enum
+        values: [none, potential, confirmed]
+    relationships:
+      related_spec:
+        target: specification
+        cardinality: many
+      related_contract:
+        target: contract
+
+  submittal:
+    display_name: "Submittal"
+    description: "Product data, shop drawings, samples, certifications"
+    file_patterns:
+      - "*submittal*"
+      - "*shop_drawing*"
+    fields_hints:
+      submittal_number:
+        type: text
+        required: true
+      title:
+        type: text
+        required: true
+      date_submitted:
+        type: date
+        required: true
+      submitted_by:
+        type: text
+      discipline:
+        type: enum
+        values: [civil, structural, mechanical, electrical, plumbing, fire_protection,
+                 architectural, geotechnical, environmental, instrumentation, process,
+                 general, other]
+      submittal_type:
+        type: enum
+        values: [product_data, shop_drawing, sample, certification, design_calculation,
+                 test_report, operation_manual, warranty, other]
+      review_status:
+        type: enum
+        values: [pending, approved, approved_as_noted, revise_resubmit, rejected, void]
+      review_date:
+        type: date
+      reviewer:
+        type: text
+      revision_number:
+        type: text
+    relationships:
+      related_spec:
+        target: specification
+        cardinality: many
+      related_contract:
+        target: contract
+      previous_revision:
+        target: submittal
+
+  # ---------------------------------------------------------------------------
+  # DESIGN DOCUMENTS
+  # ---------------------------------------------------------------------------
+  drawing:
+    display_name: "Drawing"
+    description: "Engineering drawings, sketches, diagrams"
+    file_patterns:
+      - "*.dwg"
+      - "*.dxf"
+      - "*drawing*"
+    fields_hints:
+      drawing_number:
+        type: text
+        required: true
+      title:
+        type: text
+        required: true
+      revision:
+        type: text
+      revision_date:
+        type: date
+      discipline:
+        type: enum
+        values: [civil, structural, mechanical, electrical, plumbing, fire_protection,
+                 architectural, geotechnical, environmental, instrumentation, process,
+                 general, other]
+      scale:
+        type: text
+      sheet_size:
+        type: enum
+        values: [A, B, C, D, E, custom]
+      status:
+        type: enum
+        values: [draft, issued_for_review, issued_for_construction, as_built, superseded, void]
+    relationships:
+      related_spec:
+        target: specification
+        cardinality: many
+      supersedes:
+        target: drawing
+
+  design_calculation:
+    display_name: "Design Calculation"
+    description: "Engineering calculations, analyses, design checks"
+    file_patterns:
+      - "*calc*"
+      - "*calculation*"
+      - "*analysis*"
+    fields_hints:
+      calc_number:
+        type: text
+        required: true
+      title:
+        type: text
+        required: true
+      revision:
+        type: text
+      date:
+        type: date
+      prepared_by:
+        type: text
+      checked_by:
+        type: text
+      discipline:
+        type: enum
+        values: [civil, structural, mechanical, electrical, plumbing, fire_protection,
+                 architectural, geotechnical, environmental, instrumentation, process,
+                 general, other]
+      status:
+        type: enum
+        values: [draft, checked, approved, superseded, void]
+    relationships:
+      related_drawing:
+        target: drawing
+        cardinality: many
+      related_spec:
+        target: specification
+        cardinality: many
+
+  # ---------------------------------------------------------------------------
+  # REPORTS
+  # ---------------------------------------------------------------------------
+  progress_report:
+    display_name: "Progress Report"
+    description: "Status reports, progress updates, monthly reports"
+    file_patterns:
+      - "*progress*"
+      - "*status*"
+      - "*monthly_report*"
+      - "*weekly_report*"
+    fields_hints:
+      report_number:
+        type: text
+      title:
+        type: text
+        required: true
+      reporting_period_start:
+        type: date
+      reporting_period_end:
+        type: date
+      prepared_by:
+        type: text
+      percent_complete:
+        type: number
+      key_accomplishments:
+        type: list
+        item_type: text
+      issues_concerns:
+        type: list
+        item_type: text
+      upcoming_activities:
+        type: list
+        item_type: text
+    relationships:
+      related_contract:
+        target: contract
+      previous_report:
+        target: progress_report
+
+# ============================================================================
+# GLOBAL SETTINGS
+# ============================================================================
+settings:
+  # When a document doesn't match any file pattern and the classifier is
+  # below confidence threshold, use this type. Note (M0-06 finding): the
+  # prior code dumped most docs into general_document because the classifier
+  # under-classified; versawiki routes low-confidence to `unclassified` instead.
+  default_type: general_document
+  unclassified_type: unclassified
+
+  # Fields attached to every document regardless of type. Stored as
+  # top-level columns on `documents`; everything else lands in `extras` JSONB.
+  common_fields:
+    tenant_id:
+      type: text
+      required: true
+      description: "Tenant slug (vw_admin.tenants.slug)."
+    source_id:
+      type: text
+      required: true
+      description: "Source row id within the tenant schema."
+    source_uri:
+      type: text
+      required: true
+      description: "Connector-specific stable identifier."
+    source_path:
+      type: text
+      description: "Display path for the document in its source."
+    ingested_at:
+      type: date
+      auto: true
+      description: "When this document was added to the system."
+    full_text:
+      type: text
+      description: "Full extracted text content for search."
+    summary:
+      type: text
+      description: "LLM-generated summary of the document."
+    tags:
+      type: list
+      item_type: text
+      description: "User- or AI-assigned tags."
+    confidence_score:
+      type: number
+      description: "Classifier confidence in extraction accuracy (0-1)."
+
+  # General catch-all for unclassified documents.
+  general_document:
+    display_name: "General Document"
+    description: "Unclassified or miscellaneous document"
+    fields_hints:
+      title:
+        type: text
+      date:
+        type: date
+      author:
+        type: text
+      document_type_hint:
+        type: text
+        description: "Best guess at what type this document actually is"

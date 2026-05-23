@@ -2,6 +2,28 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-22 (Wave 3 integration — second pass)
+
+**First-pass Wave 3 was killed mid-flight by a session limit before agents reported back, but the agents had committed real code to disk before dying.** On resume (Josh upgraded to Max), audited the disk state:
+
+- BE-02 source was complete (auth/, routers/admin/api_keys.py, schemas/api_key.py, 2 test files) but had 4 failing tests — all cascaded from a `secrets.token_urlsafe()` producing prefixes/secrets with `_` characters, making the `vw_<prefix>_<secret>` on-wire format ambiguous. Fixed the generator (use `secrets.token_hex`) and tightened `parse_token` to enforce min length on each part. 27/27 now green.
+- ING-01 source was complete but had no tests written. Spawned a focused ING-01 finisher subagent who wrote 40 tests (8 connector + 8 parser + 24 registry). All green. No source bugs.
+- MCP-01a source was 70% there: checkers present, schema present, but missing pyproject.toml/README/audit module/tests. Spawned an MCP-01a finisher subagent who wrote pyproject + audit/ + 41 tests. 41 pass / 1 skip (spaCy unavailable in sandbox) / 1 xfail (non-privacy bug in numeric.py: branching_factor_p50/p95 mistakenly capped at [0,1]). Captured the xfail bug for QA.
+
+**Total now: 108 tests passing across services/api, services/ingestion, services/meta-mcp.** The 3 services are independent packages — each has its own pyproject.toml and tests cleanly.
+
+**Privacy invariant operationally enforced:** `services/meta-mcp/tests/test_audit_log.py::test_write_never_includes_payload_bytes` asserts the offending payload is never written to disk. Silent passage = privacy breach. Green.
+
+**No new DECISIONS.md entries needed.** All choices fell within existing decisions or were small implementation calls.
+
+**Next: Wave 4 — BE-03 (tenant schema provisioner) + ING-02 (chunker/embedder — net-new) + MCP-02 (signature collector). All three independent.**
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-22 (Wave 2 integration)
 
 **Spawned in parallel:** Researcher (M0-06 prior-repo audit), Architect (M1-MCP-01 DomainObservation), Backend (M1-BE-01 FastAPI skeleton).

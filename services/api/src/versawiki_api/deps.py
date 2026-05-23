@@ -4,25 +4,37 @@ This module is the single seam where future tickets plug in:
 
 - ``get_db_session`` -> BE-03 will replace the stub with a real
   SQLAlchemy session bound to the tenant's schema.
-- ``api_key_required`` / ``admin_key_required`` -> BE-02 will replace
-  ``StubApiKey`` with a real argon2-validated, Redis-cached ApiKey.
-- ``get_current_tenant`` -> BE-02/03 will resolve the tenant from the
-  validated API key's ``tenant_id``.
+- ``api_key_required`` / ``admin_key_required`` -> BE-02 has wired the
+  real argon2-validated, in-memory store (with a Redis-cache wrapper
+  whose Redis client lands in BE-02b).
+- ``get_current_tenant`` -> BE-03 will resolve the tenant from the
+  validated API key's ``tenant_id`` against ``vw_admin.tenants``.
 
-Today these all return stubs or raise ``NotImplementedYet``. The
-import paths and call signatures are deliberate so the swap is purely
-a body change, not a surface change.
+Today, ``api_key_required``/``admin_key_required`` are the real deps
+re-exported from :mod:`versawiki_api.auth.middleware`; ``ApiKey`` is
+the real domain model from :mod:`versawiki_api.auth.keys`. The
+``StubApiKey`` name lives on as an alias for one release so any
+in-flight branches keep importing successfully.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Request
 
+from .auth.keys import ApiKey
+from .auth.middleware import (
+    AdminApiKey,
+    CurrentApiKey,
+    admin_key_required,
+    api_key_required,
+    get_api_key_store,
+    set_api_key_store,
+)
 from .config import Settings, get_settings
-from .errors import NotImplementedYet, Unauthenticated
+from .errors import NotImplementedYet
 from .logging import get_logger
 
 log = get_logger(__name__)
@@ -69,79 +81,13 @@ DbSession = Annotated[Any, Depends(get_db_session)]
 
 
 # ---------------------------------------------------------------------------
-# API-key auth (stub; BE-02 wires argon2 + Redis cache)
+# API-key auth (real, via auth.middleware)
 # ---------------------------------------------------------------------------
 
-@dataclass(frozen=True)
-class StubApiKey:
-    """Placeholder for the real ApiKey domain object (BE-02).
-
-    The shape is intentionally a sketch of what BE-02 will produce so
-    downstream routes can already type-hint against it.
-    """
-
-    id: str = "stub-key-id"
-    tenant_id: str = "stub-tenant-id"
-    tenant_slug: str = "stub"
-    scopes: tuple[str, ...] = ("query",)
-    is_stub: bool = True
-    raw_metadata: dict[str, Any] = field(default_factory=dict)
-
-    def has_scope(self, scope: str) -> bool:
-        return scope in self.scopes
-
-
-def _parse_bearer(authorization: str | None) -> str | None:
-    if not authorization:
-        return None
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    return parts[1].strip() or None
-
-
-def api_key_required(
-    request: Request,
-    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
-) -> StubApiKey:
-    """Validate the API key on the request.
-
-    BE-02 replaces the body. The signature is locked: routes already
-    type-hint ``current_api_key: Annotated[StubApiKey, Depends(api_key_required)]``
-    today, and BE-02 will rename the return type to the real ``ApiKey``
-    domain object.
-    """
-    token = _parse_bearer(authorization)
-    if token is None:
-        raise Unauthenticated(message="Missing Authorization: Bearer <key> header.")
-
-    # TODO(BE-02): argon2 verify against vw_admin.api_keys.key_hash, with a
-    # short-TTL Redis cache. For now, accept any non-empty bearer token in
-    # the dev/test envs so route shape tests can drive the API surface.
-    settings = settings_dep(request)
-    if settings.env not in {"dev", "test"}:
-        # Refuse in staging/prod until BE-02 lands.
-        raise Unauthenticated(message="API-key auth not yet implemented in this environment.")
-
-    log.debug("api_key_stub_accepted", env=settings.env)
-    return StubApiKey()
-
-
-CurrentApiKey = Annotated[StubApiKey, Depends(api_key_required)]
-
-
-def admin_key_required(current_api_key: CurrentApiKey) -> StubApiKey:
-    """Require the ``admin`` scope on top of a valid key."""
-    if not current_api_key.has_scope("admin") and not current_api_key.is_stub:
-        # The is_stub bypass means admin routes are exercisable in dev/test.
-        # BE-02 removes the bypass when real scopes are loaded from the DB.
-        from .errors import PermissionDenied
-
-        raise PermissionDenied(message="This endpoint requires the 'admin' scope.")
-    return current_api_key
-
-
-AdminApiKey = Annotated[StubApiKey, Depends(admin_key_required)]
+# BE-01 shipped StubApiKey. BE-02 swaps to the real ApiKey but keeps
+# the legacy name as an alias for one release so any half-merged branch
+# still imports cleanly.
+StubApiKey = ApiKey
 
 
 # ---------------------------------------------------------------------------
@@ -173,3 +119,23 @@ def get_current_tenant(current_api_key: CurrentApiKey) -> StubTenantContext:
 
 
 CurrentTenant = Annotated[StubTenantContext, Depends(get_current_tenant)]
+
+
+__all__ = [
+    "ApiKey",
+    "StubApiKey",
+    "AdminApiKey",
+    "CurrentApiKey",
+    "CurrentTenant",
+    "DbSession",
+    "Settings",
+    "SettingsDep",
+    "StubTenantContext",
+    "admin_key_required",
+    "api_key_required",
+    "get_api_key_store",
+    "get_current_tenant",
+    "get_db_session",
+    "set_api_key_store",
+    "settings_dep",
+]

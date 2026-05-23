@@ -66,10 +66,24 @@ class Unauthenticated(VersawikiHTTPException):
     default_message = "Missing or invalid API key."
 
 
+# Alias for BE-02's ticket spec, which uses 'UnauthorizedError' / 'ForbiddenError'
+# vocabulary. Keep both names live so route code can read either way.
+UnauthorizedError = Unauthenticated
+
+
 class PermissionDenied(VersawikiHTTPException):
     default_status_code = 403
     default_code = "permission_denied"
     default_message = "API key lacks the required scope."
+
+
+ForbiddenError = PermissionDenied
+
+
+class ApiKeyNotFound(VersawikiHTTPException):
+    default_status_code = 404
+    default_code = "api_key_not_found"
+    default_message = "API key not found."
 
 
 class NotImplementedYet(VersawikiHTTPException):
