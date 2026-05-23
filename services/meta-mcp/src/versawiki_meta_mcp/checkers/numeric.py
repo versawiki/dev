@@ -11,6 +11,9 @@ payload must be one of:
   (d) an integer that the schema marks as a "structural count": small,
       meaning fewer than 1000, and bounded by the schema's own `le=` /
       `Field(...)` constraints.
+  (e) a real-valued statistic (e.g. branching factor per spec §3.1) — a
+      non-negative float bounded above by STRUCTURAL_COUNT_MAX. These are
+      *not* ratios: typical trees legitimately have branching factor > 1.
 
 Anything else is RAW_NUMERIC — a hard reject.
 
@@ -26,6 +29,11 @@ We pre-compute the set of "allowed numeric field json-paths" by walking the
 schema. Any numeric leaf at a path not in this set is forbidden. That is
 *stricter* than the spec text but matches the spec's intent: numerics only
 cross when the schema explicitly says so.
+
+Three leaf buckets:
+  ALLOWED_RATIO_LEAVES      — float in [0.0, 1.0]
+  ALLOWED_REAL_STAT_LEAVES  — non-negative float < STRUCTURAL_COUNT_MAX
+  ALLOWED_COUNT_LEAVES      — int in [0, STRUCTURAL_COUNT_MAX)
 """
 
 from __future__ import annotations
@@ -44,12 +52,11 @@ STRUCTURAL_COUNT_MAX = 1000
 # numeric leaves. We match by terminal segment rather than full path so
 # we don't have to enumerate every payload variant explicitly.
 #
-# Two buckets:
-#  RATIO_LEAVES   — must be in [0.0, 1.0]
-#  COUNT_LEAVES   — must be int in [0, STRUCTURAL_COUNT_MAX)
+# Three buckets:
+#  RATIO_LEAVES     — must be in [0.0, 1.0]
+#  REAL_STAT_LEAVES — must be non-negative float < STRUCTURAL_COUNT_MAX
+#  COUNT_LEAVES     — must be int in [0, STRUCTURAL_COUNT_MAX)
 ALLOWED_RATIO_LEAVES: frozenset[str] = frozenset({
-    "branching_factor_p50",
-    "branching_factor_p95",
     "leaf_to_internal_ratio",
     "induced_vs_seed_ratio",
     "adherence_rate",
@@ -60,6 +67,16 @@ ALLOWED_RATIO_LEAVES: frozenset[str] = frozenset({
     "overall_confidence_p10",
     "classification_failure_rate",
     "ontology_assignment_failure_rate",
+})
+
+# Real-valued statistic leaves — non-negative floats that may exceed 1.0
+# but are bounded above by STRUCTURAL_COUNT_MAX to keep the privacy-safe
+# band intact. Per spec §3.1, branching factor is the canonical example:
+# a typical tree has branching factor > 1, so the ratio clamp doesn't
+# apply — but the value still must stay in the low-resolution band.
+ALLOWED_REAL_STAT_LEAVES: frozenset[str] = frozenset({
+    "branching_factor_p50",
+    "branching_factor_p95",
 })
 
 ALLOWED_COUNT_LEAVES: frozenset[str] = frozenset({
@@ -133,6 +150,24 @@ def scan_numeric_pattern(serialized: dict[str, Any]) -> CheckResult:
                 passed=False,
                 reason_code=ReasonCode.RAW_NUMERIC,
                 details=f"ratio leaf `{leaf}` out of [0,1] at {json_path}",
+            )
+
+        # Path A': real-valued statistic leaves — non-negative float,
+        # < STRUCTURAL_COUNT_MAX. These come from typical-tree statistics
+        # (e.g. branching factor) which the spec §3.1 explicitly describes
+        # as real-valued (often > 1.0), so the ratio clamp doesn't apply.
+        # The upper bound keeps the privacy-safe band intact.
+        if leaf in ALLOWED_REAL_STAT_LEAVES:
+            if isinstance(value, (int, float)) and 0.0 <= float(value) < STRUCTURAL_COUNT_MAX:
+                continue
+            return CheckResult(
+                stage=Stage.NUMERIC_PATTERN,
+                passed=False,
+                reason_code=ReasonCode.RAW_NUMERIC,
+                details=(
+                    f"real-stat leaf `{leaf}` out of [0,{STRUCTURAL_COUNT_MAX})"
+                    f" at {json_path}"
+                ),
             )
 
         # Path B: structural-count leaves must be int in [0, STRUCTURAL_COUNT_MAX).

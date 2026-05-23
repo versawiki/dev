@@ -5,13 +5,12 @@ at stage 1, so this test exercises numerics that pass the schema but
 violate the numeric-stage's stricter band:
 
   * ratio leaves must be in [0,1]
+  * real-stat leaves must be non-negative float < STRUCTURAL_COUNT_MAX
   * structural-count leaves must be int in [0, STRUCTURAL_COUNT_MAX)
   * dict[Literal, int] values must be in [0, STRUCTURAL_COUNT_MAX)
 """
 
 from __future__ import annotations
-
-import pytest
 
 from versawiki_meta_mcp.checkers.numeric import (
     STRUCTURAL_COUNT_MAX,
@@ -71,25 +70,18 @@ def test_structural_count_above_max_rejected(envelope_of):
     assert r.failed_reason == ReasonCode.RAW_NUMERIC
 
 
-def test_ratio_out_of_range_rejected(envelope_of):
-    """`branching_factor_p50` is in ALLOWED_RATIO_LEAVES; > 1.0 is RAW_NUMERIC."""
+def test_ratio_out_of_range_rejected():
+    """Direct invocation: a ratio leaf at value > 1.0 fails RAW_NUMERIC.
 
-    env = envelope_of(
-        {
-            "kind": "ontology_shape",
-            "depth": 4,
-            "node_count_bucket": "51-200",
-            "branching_factor_p50": 2.5,
-            "branching_factor_p95": 0.7,
-            "leaf_to_internal_ratio": 0.75,
-            "kind_distribution": {"category": 12, "entity": 30, "topic": 8},
-            "induced_vs_seed_ratio": 0.4,
-        }
-    )
-    r = CheckerPipeline().check(env)
+    We bypass `CheckerPipeline` because every payload-level ratio leaf in
+    the schema is bounded by `Field(le=1.0)`, so a >1 value would fail at
+    stage 1 (schema_validate) rather than stage 4. Stage 4 is the
+    invariant audit — this test exercises that audit directly.
+    """
+    bad = {"payload": {"adherence_rate": 1.5}}
+    r = scan_numeric_pattern(bad)
     assert not r.passed
-    assert r.failed_stage == Stage.NUMERIC_PATTERN
-    assert r.failed_reason == ReasonCode.RAW_NUMERIC
+    assert r.reason_code == ReasonCode.RAW_NUMERIC
 
 
 def test_bucket_labels_and_ratios_pass_numeric_stage(
@@ -136,20 +128,10 @@ def test_structural_count_max_constant_is_1000():
     assert STRUCTURAL_COUNT_MAX == 1000
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Source bug: numeric.py classifies branching_factor_p50/p95 as ratios "
-        "in ALLOWED_RATIO_LEAVES, capping them at [0,1]. Per spec §3.1 these "
-        "are real branching factors (often >1 for typical trees). The "
-        "implementation is overly strict — not a privacy issue but blocks "
-        "legitimate principle-only data. Tracked in notes/mcp-builder.md."
-    ),
-    strict=True,
-)
 def test_branching_factor_above_one_should_pass(envelope_of):
     """Per spec §3.1, branching factor is a real-valued statistic, not a
-    ratio. A tree of branching factor 2.5 is principle-only data. The
-    numeric stage rejects it today; see xfail reason."""
+    ratio. A tree of branching factor 2.5 is principle-only data and must
+    pass the numeric stage."""
 
     env = envelope_of(
         {
@@ -168,3 +150,21 @@ def test_branching_factor_above_one_should_pass(envelope_of):
         f"branching factor 2.5 should pass; failed at "
         f"{r.failed_stage}/{r.failed_reason}"
     )
+
+
+def test_branching_factor_real_stat_passes_via_unit_scan():
+    """Direct invocation: a branching_factor leaf at 5.7 passes the
+    numeric stage as a real-valued statistic. Belt-and-suspenders to the
+    pipeline-level test above."""
+    safe = {"payload": {"branching_factor_p50": 5.7, "branching_factor_p95": 12.3}}
+    r = scan_numeric_pattern(safe)
+    assert r.passed
+
+
+def test_branching_factor_above_structural_max_rejected():
+    """Real-stat leaves are still bounded — values >= STRUCTURAL_COUNT_MAX
+    are RAW_NUMERIC to keep the privacy-safe band intact."""
+    bad = {"payload": {"branching_factor_p50": 1500.0}}
+    r = scan_numeric_pattern(bad)
+    assert not r.passed
+    assert r.reason_code == ReasonCode.RAW_NUMERIC
