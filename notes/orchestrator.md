@@ -2,6 +2,40 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (Wave 6 integration + sleep handoff)
+
+**Spawned in parallel:** Backend (M1-BE-05 MCP-over-HTTP), Ingestion (M1-ING-04 ontology inducer), MCP-builder (M1-MCP-04 skill applier).
+
+**All three returned strong, non-overlapping work. Test deltas:**
+
+- api: 94 -> 115 (+21 BE-05: MCP transport, tools, schemas, SSE streaming, tenant isolation)
+- ingestion: 133 -> 180 (+47 ING-04: clusterer, community detector, taxonomy proposer, inducer, tree merge, fallback impls)
+- meta-mcp: 141 -> 166 (+25 MCP-04: loader, matcher, prompt injector, cache, opt-out applier)
+
+**Total now: 461 tests passing across three services.** This session: 461 - 108 (after Wave 2) = 353 tests added in Waves 3 + 4 + 5 + 6 plus the BE-02 bug fix.
+
+**M1 backend is functionally complete:** auth + provisioner + query routes + MCP endpoint. Remaining M1 work is ingestion glue (ING-05 wiki page builder, ING-06 re-indexer) and QA tickets (overnight-safe).
+
+**The product's positioning claim is now operationally true:** customers' content stays in their tenant boundary; only learned shapes cross. The 5-stage privacy checker pipeline gates emission (collector) AND application (writer), AND opt-out is honored at the topmost call. Four privacy tests would mean a breach if any silently passed wrong — all four green.
+
+**Overnight handoff:**
+
+- Wave 6 committed and pushed.
+- PAT written to gitignored `.vw-cron-token` so the scheduled task can push (NOT committed; verified with `git check-ignore -v`).
+- Scheduled task `vw-overnight` runs every 4 hours. It picks one ticket from STATUS.md's "Overnight safe list", spawns ONE specialist (not three parallel), runs the full test suite for the affected service, and commits + pushes only if green. If anything is ambiguous, it writes to `notes/orchestrator.md` and stops without pushing — Josh reviews in the morning.
+
+**Watch for in morning:**
+
+- 1-3 new commits on `main` from `vw-overnight` (each with `[overnight]` prefix).
+- Any entries in `notes/orchestrator.md` from the cron stopping for review.
+- `STATUS.md` will be re-overwritten by the cron with its tally each run.
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-23 (Wave 5 integration)
 
 **Spawned in parallel:** Backend (M1-BE-04 query routes), Ingestion (M1-ING-03 LLM classifier), MCP-builder (M1-MCP-03 skill writer).

@@ -1,3 +1,125 @@
+## 2026-05-23 — M1-BE-05 done: MCP-over-HTTP endpoint
+
+**Result:** 115 tests pass, 2 skip cleanly. 21 new tests across the 6
+MCP suites; existing 94 BE-01/02/03/04 tests unchanged.
+
+**Test run (sandbox):**
+
+```
+cd services/api
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/vwpyc PYTHONDONTWRITEBYTECODE=1 \
+  python3 -m pytest -q tests/
+# 115 passed, 2 skipped in 7.58s
+```
+
+**What landed:**
+
+- `mcp/schemas.py` — Pydantic v2 input/output models for the four tools.
+  `tool_definitions()` derives the JSON-Schema payload for `tools/list`
+  via `model_json_schema()` so input validation and the wire schema stay
+  in lockstep. `TOOL_NAMES` is a frozen tuple so tests assert the names
+  never drift.
+- `mcp/tools.py` — four async tool handlers, signatures pinned to
+  `tool_<name>(tenant_id, *, arguments, ...)`. `search` reuses the BE-04
+  embedding-then-empty-envelope path (same `QueryResponse` shape). The
+  other three return their stub envelopes (`list_ontology`) or a
+  `not_found` `ToolError` (`read_page`, `read_chunk`) until ING-02 /
+  ING-04 / ING-05 land real persistence. Errors carry a stable code
+  (`-32602` invalid_arguments, `-32004` not_found) and structured
+  `data`.
+- `mcp/transport.py` — minimal MCP-over-HTTP streamable transport.
+  JSON-RPC 2.0 envelope on POST `/mcp` with `initialize`, `tools/list`,
+  `tools/call`. SSE response (`event: message`, single envelope) when
+  `Accept: text/event-stream`; plain JSON otherwise. Tenant identity is
+  taken EXCLUSIVELY from the validated API key — a `tenant_id` field in
+  `arguments` is rejected with JSON-RPC `-32602` and the offending field
+  surfaced in `data`.
+- `mcp/router.py` — single-route APIRouter, `POST ""`. Mounted at
+  `/mcp` (no per-tenant path segment; the v1 architecture doc § 5
+  resolves tenant via the key, not the URL). Returns `Response` with
+  `response_model=None` so FastAPI doesn't try to introspect the
+  JSON/Streaming union.
+- `routers/__init__.py` — uncommented the BE-05 mount point; the MCP
+  router is now wired into `create_app`.
+
+**Contract pinned by tests:**
+
+1. **Four tool names, exact.** `search`, `read_page`, `read_chunk`,
+   `list_ontology`. Renaming any of them is a breaking change for every
+   LLM client. Pinned by `test_tools_list_returns_exactly_four_tools`
+   and the `available_tools` field on the `method_not_found` error.
+2. **`tools/call name=search` returns the same envelope as BE-04.**
+   `{answer_chunks, pages, query_id, took_ms}`. Pinned by
+   `test_search_returns_query_envelope`.
+3. **Embedding provider invoked exactly once per `search`.** And NEVER
+   on a validation failure (`test_search_missing_q_returns_invalid_params_error`).
+4. **Tool errors live inside the JSON-RPC envelope, HTTP stays 200.**
+   `read_page`/`read_chunk` 404s, unknown-tool errors, and arguments-
+   smuggling-tenant-id rejections all return HTTP 200 with `error` in
+   the body. Pinned by `test_read_page_unknown_id_returns_envelope_not_found`
+   and `test_tenant_id_in_arguments_is_rejected`.
+5. **Cross-tenant via JSON-RPC body is impossible.** Tenant comes from
+   the API key only. `arguments.tenant_id` is rejected without ever
+   calling the embedder. Pinned by `test_tenant_id_in_arguments_is_rejected`.
+6. **SSE and JSON paths return the same envelope.** Same `id`, same
+   `result`, same embedder side effects. The SSE response is a single
+   `event: message` carrying the envelope JSON in `data:`. Pinned by
+   `test_search_sse_response_carries_result_event`.
+7. **Missing auth = HTTP 401 (not a JSON-RPC error).** The bearer is
+   the outermost gate; an LLM client without a valid key never gets to
+   the dispatcher. Pinned by `test_initialize_without_auth_returns_401`.
+
+**Decisions made (cheap; logged here, not DECISIONS.md):**
+
+- **Server protocol version `2025-06-18`.** Date-based string; LLM
+  clients feature-detect on it. The MCP spec moves quickly enough that
+  pinning a date is easier than tracking semver.
+- **JSON-RPC server-error codes for app errors.** `-32004` for
+  not-found, `-32602` for invalid arguments (re-uses the spec
+  invalid_params), `-32601` for unknown tool. Inside the -32000/-32099
+  range the spec leaves us free to define our own.
+- **`Response` return type with `response_model=None`.** FastAPI tried
+  to build a response model from the `JSONResponse | StreamingResponse`
+  union and failed; the clean fix is to disable response-model
+  introspection for this route. The transport assembles the right
+  Response subclass internally.
+- **SSE = single `message` event for now.** The streamable transport
+  spec allows multi-event streams; our four read-only tools don't
+  produce partial results, so one event per response is enough. If we
+  later add a long-running tool (e.g., `generate_page`) the transport's
+  `_sse_iter` is the one place to extend.
+- **`jsonschema` validator picked at runtime.** Sandbox ships
+  jsonschema 3.x which only has Draft 7. Production / a fresh install
+  gets Draft 2020-12. Tests prefer the newest validator the runtime
+  knows about; Pydantic-emitted schemas validate under both.
+
+**Follow-ups for the next backlog wave:**
+
+- **BE-05b: hook `search` into the real chunks SQL** once ING-02 ships
+  the pgvector column. Today both the REST and MCP paths embed but
+  return empty; flipping to real rows is a body-only change inside
+  `tool_search`.
+- **BE-05c: per-tenant tool-description tuning.** Architecture doc § 5
+  notes that the meta-MCP will eventually write per-tenant tool blurbs
+  ("search this customer\'s solar-project documents (SLDs, civil
+  drawings, RFIs)") into the `description` field. The hook lives in
+  `tool_definitions()` — accept a tenant id, look up overrides from
+  the meta-MCP, merge.
+- **BE-05d: rate limit + per-tool token-budget headers.** The
+  architecture's "token budget discipline" (each response sized) needs
+  a wrapper around the dispatcher. Not blocking; ship after a real
+  customer hits the endpoint and we have a usage shape.
+- **Notifications path.** `notifications/initialized` and friends are
+  accepted silently today; we could wire a no-op acknowledgment if any
+  LLM client complains.
+
+**Sandbox quirks unchanged:**
+
+- Python 3.10 in the bash mount; tests run with `PYTHONPATH=src`.
+- `jsonschema` 3.x — older Draft-7-only API. Tests detect and adapt.
+
+---
+
 _Backend engineer's working notes. Newest at top._
 
 ## 2026-05-22 — M1-BE-04 done: v1 query API routes

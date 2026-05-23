@@ -362,3 +362,75 @@ Prior 106 tests still pass. 35 new tests across 5 files:
   documented in DECISIONS).
 * No remaining xfails introduced. `branching_factor_p*` xfail from
   MCP-01a is unchanged.
+
+## 2026-05-23 — M1-MCP-04 skill applier
+
+Built the read-only counterpart to MCP-03's writer pipeline. The
+applier is the surface the ingestion service calls to get a "learned
+patterns" text blob to prepend to its classifier / taxonomy-proposer
+prompts.
+
+### Files added under `services/meta-mcp/src/versawiki_meta_mcp/applier/`
+
+* `__init__.py` — re-exports `SkillApplier`, `MatchedSkill`,
+  `SkillMatcher`, `SkillLibraryLoader`, `SkillPromptInjector`,
+  `AppliedSkillCache`, plus the stable separator constants
+  `APPLIED_TEXT_SEPARATOR_PREFIX` and `APPLIED_TEXT_END_MARKER`.
+* `loader.py` — `SkillLibraryLoader` walks the on-disk
+  `<skills_root>/<domain>/<kind>__<title-slug>__v<n>.md` layout,
+  parses files into `LoadedSkill` (SkillRecord + body), indexes by
+  `(domain, kind)` and by `domain`. Reloads only when the tree's
+  recursive max-mtime watermark changes. Skips unrecognised files.
+* `matcher.py` — `SkillMatcher`: domain filter + vocab-map Jaccard +
+  doc-type Jaccard + per-kind bonus. Weights: base domain 0.30,
+  vocab 0.35, doc-type 0.25, kind-bonus 0.10.
+* `prompt_injector.py` — `SkillPromptInjector`: renders accepted
+  matches into the stable format
+  `--- LEARNED PATTERN: <title> ---\n<body>\n--- END ---`, joined by
+  `\n\n`. Respects `max_chars` (default 4000) and `min_score` (0.4).
+* `cache.py` — `AppliedSkillCache`: LRU keyed by
+  `(tenant_anon_id, signature_hash)` with mtime-watermark eviction.
+* `applier.py` — `SkillApplier`: top-level orchestrator. `apply()` is
+  async; honours opt-out at the very top (returns None, no cache
+  touch, no matched-skill IDs logged against the tenant).
+
+### Tests added (25 new = 166 total)
+
+* `test_skill_loader.py` (5)
+* `test_skill_matcher.py` (4)
+* `test_skill_prompt_injector.py` (7)
+* `test_skill_applier_opt_out.py` (2)
+* `test_skill_applier_cache.py` (3)
+* `test_skill_applier_e2e.py` (4)
+
+### Applied-text format (LOCKED)
+
+```
+--- LEARNED PATTERN: <title> ---
+<body markdown>
+--- END ---
+```
+
+Multiple skills are joined by `\n\n`. Constants:
+`APPLIED_TEXT_SEPARATOR_PREFIX = "--- LEARNED PATTERN: "`,
+`APPLIED_TEXT_END_MARKER = "--- END ---"`.
+
+### Cache invalidation rule
+
+Each cache entry pins the loader's mtime watermark at write time. On
+lookup the watermark is re-checked; mismatch evicts. The writer's
+only mutations (new versioned file writes) bump some file's mtime,
+which bumps the watermark, which evicts caches.
+
+### Opt-out posture
+
+`SkillApplier.apply` short-circuits at the very top when
+`tenant_config.opt_out=True`: returns None, no cache touch, no
+matched-skill IDs logged against the tenant.
+
+### Follow-ups
+
+* ING-03's `prompts.py` should call `SkillApplier.apply(...)` and
+  prepend the returned string to SYSTEM_PROMPT or the user prompt.
+* The same applier can serve the taxonomy-proposer (ING-04) with
+  `context="taxonomy-proposer"`, `kind="ontology-shape"`.

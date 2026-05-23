@@ -1,8 +1,21 @@
-"""Placeholder package for the per-tenant MCP-over-HTTP endpoint.
+"""Per-tenant MCP-over-HTTP endpoint (BE-05).
 
-BE-05 will fill this in with a FastAPI subrouter implementing the
-streamable MCP transport, mounted at ``/mcp``. See ``README.md`` in
-this directory and ``docs/architecture/v1.md`` section 5.
+The package is split into:
+
+- :mod:`.schemas` — Pydantic input/output models + JSON-Schema export
+  for ``tools/list``.
+- :mod:`.tools` — the four tool implementations (``search``,
+  ``read_page``, ``read_chunk``, ``list_ontology``).
+- :mod:`.transport` — JSON-RPC 2.0 dispatch + JSON / SSE response
+  branching.
+- :mod:`.router` — FastAPI ``APIRouter`` mounted by
+  :func:`versawiki_api.routers.register_routers` at ``/mcp``.
+
+Wire shape and reasoning live in ``docs/architecture/v1.md`` § 5.
 """
 
 from __future__ import annotations
+
+from .router import router
+
+__all__ = ["router"]

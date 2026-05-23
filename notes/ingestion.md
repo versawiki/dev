@@ -1,3 +1,125 @@
+## 2026-05-23 — M1-ING-04 ontology inducer (net-new, complete)
+
+Builds the layer that takes embedded `ChunkRecord`s and produces an
+`OntologyTree`. Pipeline matches the locked decision in `DECISIONS.md`
+(2026-05-22) and the recommended M1 approach in `docs/research/ontology.md`:
+**BERTopic clusters -> LLM-proposed taxonomy -> entity-graph + Leiden
+community detection**. Bootstraps from the AEC starter taxonomy when the
+corpus contains AEC signal words.
+
+### New package layout under `services/ingestion/src/versawiki_ingestion/ontology/`
+
+- `models.py` — `OntologyNode` and `OntologyTree` (Pydantic v2 frozen).
+  Mirrors `ontology_nodes` in `docs/architecture/v1.md` §2. `kind` is
+  `Literal["seed", "induced"]`; `centroid_embedding` must be `EMBEDDING_DIM`
+  (1024) when present. Tree-level validators enforce no cycles, no orphan
+  parents, no duplicate ids.
+- `clusterer.py` — `OntologyClusterer` Protocol with two impls:
+  - **`SimpleEmbeddingClusterer`** — numpy-only k-means with k-means++
+    seeding, deterministic given `seed`. **This is the active impl in the
+    sandbox and CI**; everything pip-installable for BERTopic (umap-learn,
+    hdbscan, scikit-learn, scipy, numba) is too heavy for the sandbox.
+  - **`BERTopicClusterer`** — adapter that lazy-imports `bertopic`. Raises a
+    clear `RuntimeError` if the package isn't installed. To swap it in,
+    wire `OntologyInducer(clusterer=BERTopicClusterer(...), ...)`.
+- `taxonomy_proposer.py` — `LLMTaxonomyProposer` Protocol plus
+  `StubTaxonomyProposer` (deterministic top-token labels, used in tests),
+  `AnthropicTaxonomyProposer` (Claude Sonnet 4.5, primary in production),
+  and `OpenAITaxonomyProposer` (secondary). HTTP providers fall back to
+  the stub's logic on any error so a flaky LLM never blocks induction.
+- `community.py` — `OntologyCommunityDetector` Protocol with two impls:
+  - **`SimpleConnectedComponentsDetector`** — threshold cosine similarity
+    matrix + union-find. **Active in the sandbox and CI.**
+  - **`LeidenCommunityDetector`** — adapter that lazy-imports
+    `python-igraph` + `leidenalg`. Raises clear error if missing.
+- `inducer.py` — `OntologyInducer` orchestrates the full pipeline. Bootstraps
+  roots from `aec_starter_taxonomy.yaml` when `_corpus_looks_aec_shaped()`
+  returns True (>=3 distinct AEC signal tokens found across the chunks);
+  otherwise emits LLM-proposed roots only. Unused seed roots are pruned to
+  keep the tree compact.
+- `merge.py` — `merge_with_existing(new_tree, existing_tree)` preserves
+  stable node IDs across re-induction. Matches induced nodes by their
+  full `(root_label, ..., node_label)` ancestor path; seed nodes match
+  on `id`. Parent-id rewriting cascades through the id map. Pure function.
+
+### Swap procedure: turning on BERTopic / Leiden in production
+
+1. `pip install bertopic python-igraph leidenalg` in the worker image.
+2. At ingestion-orchestrator construction, replace the defaults:
+   ```python
+   inducer = OntologyInducer(
+       clusterer=BERTopicClusterer(min_topic_size=10),
+       proposer=AnthropicTaxonomyProposer(),
+       community_detector=LeidenCommunityDetector(resolution=1.2),
+       seed_taxonomy=Taxonomy.starter(),
+   )
+   ```
+   The Protocols cover the shape; no other code changes.
+3. Tests that exercise the real impls live behind
+   `pytest.mark.skipif(importlib.util.find_spec("bertopic") is None, ...)`
+   so they skip-rather-than-fail in CI without the deps.
+
+### Tests added under `services/ingestion/tests/`
+
+- `test_clusterer_simple.py` — 10 tests: empty-corpus -> empty result,
+  dim validation, drops unembedded chunks, determinism by seed, target_k
+  validation, Protocol compliance, orthogonal-vector partitioning,
+  centroid-equals-member-mean.
+- `test_taxonomy_stub.py` — 6 tests: one label per cluster, determinism,
+  top-token selection, empty-cluster placeholder, stopword filtering,
+  Protocol compliance.
+- `test_community_simple.py` — 10 tests: empty/singleton/orthogonal cases,
+  threshold validation, transitive closure, partition property,
+  cluster->community lookup, Protocol compliance.
+- `test_inducer_pipeline.py` — 6 tests: end-to-end ~50-chunk non-AEC corpus
+  yields an `OntologyTree` with depth >=2, no empty leaves, every input
+  chunk reachable from the tree, multi-leaf distribution, empty-input,
+  default-construction.
+- `test_inducer_seed_bootstrap.py` — 5 tests: AEC sniffer recognises AEC
+  corpus, rejects non-AEC; AEC corpus + seed taxonomy -> seed-kind roots;
+  non-AEC corpus or no taxonomy -> induced roots; unused seed roots are
+  pruned.
+- `test_merge_preserves_stable_ids.py` — 10 tests: unchanged labels keep
+  their existing id, novel labels keep their fresh id, parent-id cascading
+  rewrite, empty-tree edges, seed-id preservation, function-purity,
+  realistic re-induction scenario, embedding consistency.
+
+### Test pass count
+
+```
+cd /sessions/dazzling-intelligent-thompson/mnt/versawiki/services/ingestion
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/vwpyc PYTHONDONTWRITEBYTECODE=1 \
+  python -m pytest -q tests/
+```
+
+```
+180 passed in 2.46s
+```
+
+(133 existing + 47 net-new.)
+
+### Privacy boundary note
+
+The induced tree's labels are tenant-private raw text. They never cross
+the meta-MCP boundary directly — `compute_ontology_shape()` in
+`services/meta-mcp` already strips them and only emits structural counts
+(node_count buckets, branching factors, induced/seed ratio).
+
+### Left for future tickets
+
+- **M1-ING-05 (or similar)**: pipeline integration — wire `OntologyInducer`
+  into `process_document.py` / a corpus-level orchestrator so a full
+  ingestion run produces both ChunkRecords AND an OntologyTree per tenant.
+- **Real BERTopic / Leiden enablement** as soon as the production worker
+  image has the deps. The Protocols are ready; just swap the defaults.
+- **Entity + relationship extraction** (research.md §3) — adds a third
+  layer below "topic" leaves for actual named entities. Out of scope for
+  ING-04; depends on per-chunk NER + LLM augmentation.
+- **Query-driven re-indexing** (research.md §4) — needs `query_log`
+  rows from BE-04 to be flowing first.
+
+---
+
 
 ## 2026-05-22 — M1-ING-02 chunker + embedder pipeline (net-new, complete)
 

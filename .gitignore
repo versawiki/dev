@@ -49,3 +49,7 @@ pytest-cache-files-*/
 **/__pycache__/
 *.pyc
 *.egg-info/
+
+# Credentials — never commit
+.git-credentials
+.vw-cron-token
