@@ -162,8 +162,10 @@ def test_compute_ontology_shape_buckets_correctly(tenant_config):
     )
     out = compute_ontology_shape(raw, tenant_config)
     assert out.node_count_bucket == "51-200"
-    assert 0.0 <= out.branching_factor_p50 <= 1.0
-    assert 0.0 <= out.branching_factor_p95 <= 1.0
+    # branching factors are structural shape stats (spec §3.1), not ratios —
+    # they are non-negative reals that may exceed 1.0.
+    assert out.branching_factor_p50 >= 0.0
+    assert out.branching_factor_p95 >= 0.0
     assert 0.0 <= out.leaf_to_internal_ratio <= 1.0
     assert out.induced_vs_seed_ratio == pytest.approx(8 / 20)
     assert out.kind_distribution == {"category": 10, "entity": 30, "topic": 5}
@@ -180,6 +182,33 @@ def test_compute_ontology_shape_no_induction_input(tenant_config):
     out = compute_ontology_shape(raw, tenant_config)
     assert out.induced_vs_seed_ratio is None
     assert out.node_count_bucket == "11-50"
+
+
+def test_compute_ontology_shape_branching_factor_above_one_preserved(tenant_config):
+    """Branching factors > 1.0 must NOT be clamped by compute_ontology_shape.
+
+    Per spec §3.1, branching_factor_p50/p95 are structural tree-shape
+    statistics (average children per node), not probabilities. A node with
+    3 children has branching factor 3 — legitimate principle-only data.
+    The collector previously called _clamp01(), silently discarding real
+    signal.  This test pins the correct behaviour end-to-end.
+    """
+    raw = RawOntologyShapeEvent(
+        tenant_anon_id=SAFE_ANON_ID,
+        depth=4,
+        node_count=100,
+        branching_factors=[1.5, 2.0, 3.0, 4.5, 7.0, 2.5, 3.5],
+        kind_distribution={"category": 10, "entity": 20, "topic": 5},
+    )
+    out = compute_ontology_shape(raw, tenant_config)
+    # Median (p50) of sorted [1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 7.0] = 3.0.
+    # p95 of 7 values = 7.0.  Both must survive > 1.0.
+    assert out.branching_factor_p50 > 1.0, (
+        f"branching_factor_p50 was clamped: got {out.branching_factor_p50}"
+    )
+    assert out.branching_factor_p95 > 1.0, (
+        f"branching_factor_p95 was clamped: got {out.branching_factor_p95}"
+    )
 
 
 # ---------------------------------------------------------------------------
