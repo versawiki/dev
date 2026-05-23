@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "versawiki-qa"
+version = "0.1.0"
+description = "VersaWiki cross-service end-to-end QA smoke harness (M1-QA-01+)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Versawiki team" }]
+
+# No runtime code — this package is tests only.
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+    # Test runner + async support (matches all other service test deps).
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "httpx>=0.27,<0.29",
+    # Cross-service dependencies.  These are the only two packages the QA
+    # harness imports from; they live in sibling directories of this file.
+    # Using file:// paths so a plain `pip install -e ".[test]"` inside qa/
+    # works without a private PyPI or a monorepo build tool.
+    "versawiki-ingestion @ file:../services/ingestion",
+    "versawiki-api @ file:../services/api",
+    # fastapi[test] brings in httpx which TestClient needs.
+    "fastapi>=0.115,<0.137",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = []   # no runtime packages; only the tests/ dir matters
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
