@@ -1,0 +1,44 @@
+# Node
+node_modules/
+.next/
+dist/
+build/
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Rust / Tauri
+target/
+src-tauri/target/
+
+# Mobile
+ios/Pods/
+android/.gradle/
+android/build/
+android/app/build/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Versawiki working files
+*.local.md
+tmp/
+scratch/
