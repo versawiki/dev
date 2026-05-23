@@ -2,6 +2,24 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (tick — STOPPED, M1-MCP-01a-fix already on main)
+
+**Picked:** `M1-MCP-01a-fix` — the topmost item in the overnight safe list per STATUS.md.
+
+**Finding:** The fix is already fully landed on main as two commits:
+- `da3a4d1` — `M1-MCP-01a-fix: un-xfail branching_factor numeric checker test`
+- `fc103e5` — `M1-MCP-01a-fix: remove residual _clamp01 from branching factors in collector`
+
+Both commits predate this tick. `services/meta-mcp/` currently passes **168 tests, 1 skipped** with no xfails. The `test_branching_factor_above_one_should_pass` test (which was previously `xfail`) passes cleanly. `ALLOWED_BRANCHING_FACTOR_LEAVES` is already in `checkers/numeric.py`, `branching_factor_p50/p95` are no longer in `ALLOWED_RATIO_LEAVES`, and no `_clamp01` call touches those fields in the collector.
+
+**Why I stopped:** Per hard rule 7 — "a ticket that's already been done by someone else" — stopped without implementing anything. Opened a `[needs-review]` draft PR so Josh can see the pattern and update BACKLOG.md / STATUS.md bookkeeping manually.
+
+**Root cause (same as M1-ING-03c incident):** BACKLOG.md still lists `M1-MCP-01a-fix` in the overnight safe list and STATUS.md says it's the "next fire's top pick", but whoever landed `da3a4d1`/`fc103e5` did not update the doc files. The safe list needs a human to move this item to Done so the next tick skips it and advances to `M1-MCP-05`.
+
+**Suggested BACKLOG.md update for Josh:**
+- Move `M1-MCP-01a-fix` from the overnight safe list to Done (with `da3a4d1`/`fc103e5` reference).
+- Advance safe list top pick to `M1-MCP-05`.
+
 ## 2026-05-23 (overnight cron — STOPPED, duplicate ticket detected)
 
 **Spawned:** one Ingestion specialist on **M1-ING-03c** (the topmost item in `BACKLOG.md`'s overnight safe list at the time my reset to `origin/main` snapshotted it).
