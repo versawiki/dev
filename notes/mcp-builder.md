@@ -434,3 +434,26 @@ matched-skill IDs logged against the tenant.
   prepend the returned string to SYSTEM_PROMPT or the user prompt.
 * The same applier can serve the taxonomy-proposer (ING-04) with
   `context="taxonomy-proposer"`, `kind="ontology-shape"`.
+
+## 2026-05-23 — PII checker UUID skip extended to spaCy layer
+
+`tests/test_pipeline_pii.py::test_phone_shape_in_tenant_anon_id_rejected_by_pii_stage`
+was flaky in CI. The test sets `event_id = str(uuid.uuid4())`; the loop
+walks strings in dict order, so the random UUID is inspected before
+`tenant_anon_id`. The regex layer skipped the UUID (existing whitelist)
+but control fell through to spaCy, which occasionally tagged the random
+hex-token sequence as GPE/PERSON/ORG. That short-circuited the loop
+before it reached the real phone in `tenant_anon_id`, producing
+NER_HIT_GPE instead of NER_HIT_PHONE.
+
+Fix: the UUID whitelist now skips **both** layers \xe2\x80\x94 moved into
+`check()` directly, just after the `ALLOWED_LITERAL_STRINGS` check.
+Argument: a UUID-shaped string is `[0-9a-f]{8}-...-[0-9a-f]{12}`,
+which physically cannot encode PII content, so neither detection
+layer should ever be asked to look at it.
+
+Two regression tests (in `test_pipeline_pii.py`) pin this in
+deterministic form by mocking the `nlp` object to always classify
+input as GPE, then asserting that a UUID-shaped `event_id` passes the
+stage AND that a real phone in `tenant_anon_id` is still caught when
+`event_id` is also a UUID.

@@ -166,6 +166,19 @@ class PIIChecker:
             if value in ALLOWED_LITERAL_STRINGS:
                 continue
 
+            # UUID-shaped values are schema-typed identifiers (event_id,
+            # tenant_anon_id). Their hex+dash format physically cannot
+            # encode PII content, but random UUIDv4s occasionally:
+            #   * contain phone-shaped digit runs (3-3-4) that trip the
+            #     regex layer (~3% of runs), and
+            #   * get NER-tagged by spaCy as GPE/PERSON/ORG when the model
+            #     interprets the hex token sequence as a place/name.
+            # Both produce false positives. Skip both layers wholesale for
+            # UUID-shaped values â the schema itself is the guarantee.
+            # Tracked in notes/mcp-builder.md as the M1-MCP-02 hardening fix.
+            if _UUID_RE.match(value):
+                continue
+
             hit = _regex_scan(value)
             if hit is not None:
                 return CheckResult(

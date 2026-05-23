@@ -131,3 +131,67 @@ def test_pii_check_unit_person_name_via_spacy():
         ReasonCode.NER_HIT_GPE,
         ReasonCode.NER_HIT_GENERIC,
     }
+
+
+# ---------------------------------------------------------------------------
+# Regression: UUID-shaped values must skip BOTH PII detection layers.
+# ---------------------------------------------------------------------------
+
+
+def test_pii_check_uuid_shaped_value_bypasses_spacy_layer():
+    """UUID-shaped identifiers must skip both regex and spaCy layers.
+
+    Before the M1-MCP-02 hardening fix, an `event_id` set to a random
+    UUIDv4 could be NER-tagged by spaCy as GPE/PERSON/ORG, pre-empting
+    real PII detection in fields walked later in the envelope.
+    """
+
+    from unittest.mock import MagicMock
+
+    c = PIIChecker()
+
+    fake_doc = MagicMock()
+    fake_ent = MagicMock()
+    fake_ent.label_ = "GPE"
+    fake_doc.ents = [fake_ent]
+    c._nlp = MagicMock(return_value=fake_doc)
+    c._spacy_attempted = True
+
+    serialized = {"event_id": "bc6be0b5-7901-48fb-ae49-69d47663a776"}
+    result = c.check(serialized)
+
+    assert result.passed, (
+        f"UUID-shape value tripped spaCy NER (regression of M1-MCP-02): "
+        f"reason={result.reason_code}"
+    )
+    c._nlp.assert_not_called()
+
+
+def test_pii_check_uuid_shaped_value_does_not_mask_real_phone_in_later_field():
+    """A UUID in event_id must not pre-empt detection of a real phone in
+    a later field walked after it. This is the exact failure mode of the
+    meta-mcp CI flake (NER_HIT_GPE returned instead of NER_HIT_PHONE)."""
+
+    from unittest.mock import MagicMock
+
+    c = PIIChecker()
+
+    fake_doc = MagicMock()
+    fake_ent = MagicMock()
+    fake_ent.label_ = "GPE"
+    fake_doc.ents = [fake_ent]
+    c._nlp = MagicMock(return_value=fake_doc)
+    c._spacy_attempted = True
+
+    serialized = {
+        "event_id": "bc6be0b5-7901-48fb-ae49-69d47663a776",
+        "tenant_anon_id": "AAAAAA+1-555-123-4567BBBBB",
+    }
+    result = c.check(serialized)
+
+    assert not result.passed
+    assert result.stage == Stage.PII_NER
+    assert result.reason_code == ReasonCode.NER_HIT_PHONE, (
+        f"UUID in event_id leaked to spaCy and pre-empted phone detection: "
+        f"got {result.reason_code} (expected NER_HIT_PHONE)"
+    )
