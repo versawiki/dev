@@ -4,16 +4,18 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Last session summary
 
+- **2026-05-23 overnight cron** — *no new commit by cron* — Picked M1-ING-03c off the top of the safe list; specialist completed it cleanly (225→230 in ingestion, +5 tests, all green). At push time discovered `origin/main` had advanced to `087a59c` with a functionally identical M1-ING-03c commit landed independently. Cron abandoned its `54ddb1b`, reset to `origin/main`, and pushed this BACKLOG/STATUS/notes bookkeeping fix instead. See `notes/orchestrator.md` top entry.
 - **2026-05-23 overnight cron** — `227f5a2` — M1-ING-03b: Classifier retry on LLM 429/5xx (Anthropic + OpenAI providers, shared `_post_with_retries` helper, exponential backoff matching the embedder pattern). +10 tests in ingestion (215 → 225). All 582 tests green.
+- **2026-05-23 follow-up** — `087a59c` — M1-ING-03c: catch-all annotation in classifier prompt (Anthropic + OpenAI providers, +5 tests in ingestion, 225 → 230). Landed independently of the overnight cron; cron detected the duplicate and stopped cleanly.
 
 ## Current milestone
 
-**M1 — Local-folder ingestion (headless).** End-to-end loop closed in code. **582 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
+**M1 — Local-folder ingestion (headless).** End-to-end loop closed in code. **587 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
 
 ## Per-service current state
 
 - `services/api/` — **129 tests** — Full M1 backend (auth + provisioner + query routes + MCP-over-HTTP + real pages route).
-- `services/ingestion/` — **225 tests** (+10 from M1-ING-03b's classifier retries) — Connector + parsers + chunker/embedder + classifier (now with 429/5xx retry) + ontology inducer + wiki page builder.
+- `services/ingestion/` — **230 tests** (+5 from M1-ING-03c's catch-all annotation) — Connector + parsers + chunker/embedder + classifier (with 429/5xx retry + catch-all annotation in prompt) + ontology inducer + wiki page builder.
 - `services/meta-mcp/` — **166 tests** — Privacy checkers + audit log + signature collector + meta-store + skill writer + skill applier.
 - `services/support-agent/` — **62 tests** — Autonomous CS: KB, safe/forbidden actions, PII redaction, cross-tenant block, intake adapters, escalation queue.
 
@@ -39,7 +41,7 @@ All three protected by the `.vw-*` patterns in `.gitignore`; verified with `git 
 
 ## Overnight cron status
 
-Still live. Safe list now shrunk by one (M1-ING-03b done). Next fire will pick the topmost remaining item.
+Still live. Safe list shrunk by one more (M1-ING-03c now Done via `087a59c`). Next fire's top pick: `M1-MCP-01a-fix`.
 
 ## Blockers awaiting Josh
 

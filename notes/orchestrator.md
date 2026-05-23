@@ -2,6 +2,33 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — STOPPED, duplicate ticket detected)
+
+**Spawned:** one Ingestion specialist on **M1-ING-03c** (the topmost item in `BACKLOG.md`'s overnight safe list at the time my reset to `origin/main` snapshotted it).
+
+**Specialist completed the work cleanly:**
+- Added `catch_all_types: Iterable[str] = ()` kwarg to `render_user_prompt` in `services/ingestion/src/versawiki_ingestion/classification/prompts.py`.
+- Wired both `AnthropicClassifier` and `OpenAIClassifier` to pass `{taxonomy.default_type, taxonomy.unclassified_type}`.
+- Added 5 new tests in `services/ingestion/tests/test_prompts_catch_all_annotation.py`.
+- Verified: 230 passed / 0 failed / 0 skipped in `services/ingestion/` (225 → 230, delta +5 exactly matching the new tests). My local commit was `54ddb1b` (now abandoned).
+
+**Why I stopped:**
+On `git push origin main`, the push was rejected because `origin/main` had advanced to `087a59c` between my `git clone` (which resolved `origin/main` to `25d5deb`) and my push. Commit `087a59c` ("M1-ING-03c follow-up: extend catch-all annotation + dedicated test file", authored 12:14 UTC by `VersaWiki Agent Team`) is **functionally identical** to what my specialist just produced:
+- Same kwarg signature (`catch_all_types: Iterable[str] = ()`).
+- Same renderer logic (`- {name} (catch-all): {desc}` vs `- {name}: {desc}`).
+- Same caller wiring with `{taxonomy.default_type, taxonomy.unclassified_type}` in both classifier providers.
+- Same +5-test delta, identical test file path, ingestion now at 230.
+
+So M1-ING-03c is **done on `origin/main` already** — but `BACKLOG.md` on that same `origin/main` still lists it in the overnight safe list and in Ready. If we don't fix this, the next overnight cron will pick the same ticket and run into the same duplicate. Per the hard limit "If anything looks weird, STOP and write to notes/orchestrator.md", I did not push my duplicate. Per the same instruction, I have updated `BACKLOG.md` (M1-ING-03c → Done with reference to `087a59c`) and `STATUS.md` (last-session summary) as a minimal bookkeeping fix so the next cron has a clean picture. Those updates land in a separate `[overnight]` doc-only commit on top of `087a59c`.
+
+**Open questions for Josh (not blocking, just FYI):**
+
+1. Commit `087a59c`'s message says "Builds on the cron's M1-ING-03c (227f5a2)" — but `227f5a2` is the M1-ING-03b commit, not 03c. Either the message was hand-written and got the SHA wrong, or another agent ran without going through the orchestrator. Worth eyeballing whichever process produced `087a59c`.
+2. Whoever landed `087a59c` did not update `STATUS.md` / `BACKLOG.md`, which is what set up this collision. Maybe worth adding a step to whatever process landed it.
+3. The overnight cron currently re-snapshots `origin/main` once at start; if a parallel push lands between snapshot and push, we'll keep hitting this. Easy hardening: re-fetch and re-check the ticket's status right before commit, and abort cleanly if it shows as Done.
+
+**Next overnight pick:** the topmost remaining item in the safe list after I move 03c to Done is **`M1-MCP-01a-fix`** (un-xfail the `branching_factor` numeric checker test). Should be a tight, mechanical change.
+
 ## 2026-05-23 (M1-ING-05 — end-to-end loop closed)
 
 **Spawned:** single Ingestion specialist on M1-ING-05.
