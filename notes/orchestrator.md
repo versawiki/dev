@@ -2,6 +2,29 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (tick — STOPPED, stale safe list: M1-MCP-01a-fix and M1-MCP-05 already have open PRs)
+
+**Picked:** `M1-MCP-01a-fix` (topmost item on safe list after confirming nothing in-flight).
+
+**What I found:** Both of the next two safe-list tickets are already fully implemented, branched, pushed, and have open GitHub PRs — they just weren't moved to Done in BACKLOG.md.
+
+- `M1-MCP-01a-fix` — commits `da3a4d1` + `fc103e5` on `vw-agent/M1-MCP-01a-fix`;
+  PR #1 open: https://github.com/versawiki/dev/pull/1
+  168 meta-mcp tests pass on that branch (1 skipped: spaCy sandbox gap, pre-existing).
+
+- `M1-MCP-05` — commit `0d241c2` on `vw-agent/M1-MCP-05`;
+  PR #2 open: https://github.com/versawiki/dev/pull/2
+
+**Why I stopped:** Per rule 7, I stop and open a `[needs-review]` draft PR whenever a ticket is already done. This is the same bookkeeping gap as M1-ING-03c — a previous orchestrator run implemented the work but did not update BACKLOG.md/STATUS.md to move the tickets to Done.
+
+**Action needed by Josh:**
+1. Review and merge PR #1 (M1-MCP-01a-fix) — tests green, clean diff.
+2. Review and merge PR #2 (M1-MCP-05) — separate review recommended per 1-ticket-per-PR policy.
+3. In a follow-up human-reviewed PR, move both tickets to Done in BACKLOG.md and update STATUS.md.
+4. After the bookkeeping fix lands, the next overnight pick will be `M1-QA-01` (or `M1-QA-02`/`M1-QA-03`).
+
+**Hardening note:** The cron keeps hitting this bookkeeping gap. The safe fix (consistent with prior notes) is to update BACKLOG.md/STATUS.md atomically in the same commit that pushes the ticket's code — or add a pre-push check that aborts if the ticket is already in Done. Neither requires interactive review; flagging for Josh to decide the right pattern.
+
 ## 2026-05-23 (overnight cron — STOPPED, duplicate ticket detected)
 
 **Spawned:** one Ingestion specialist on **M1-ING-03c** (the topmost item in `BACKLOG.md`'s overnight safe list at the time my reset to `origin/main` snapshotted it).
