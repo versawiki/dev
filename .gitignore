@@ -42,3 +42,10 @@ android/app/build/
 *.local.md
 tmp/
 scratch/
+
+# Pytest scratch (sandbox-local)
+.pytest_cache/
+pytest-cache-files-*/
+**/__pycache__/
+*.pyc
+*.egg-info/

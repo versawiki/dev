@@ -2,6 +2,29 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-22 (Wave 2 integration)
+
+**Spawned in parallel:** Researcher (M0-06 prior-repo audit), Architect (M1-MCP-01 DomainObservation), Backend (M1-BE-01 FastAPI skeleton).
+
+**All three returned coherent, high-quality output.** Three big takeaways:
+
+1. **Prior MCPs are vector-RAG in name only.** Researcher's file-level audit caught what live-probes couldn't: the schema column exists but is never written, `sentence-transformers` is commented out in requirements, search is pure `ILIKE`. M1-ING-02 (chunker + embedder + vector retrieval) is now flagged as fully net-new — no prior code to lift. Recorded as a planning fact in DECISIONS.md.
+2. **DomainObservation v1 is tight.** 8 payload variants, discriminated union, no `str` field accepts arbitrary text anywhere, numerics-as-buckets only. Architect's 5 open questions were each within day-or-two-rework and reversible, so accepted all his recommendations as Orchestrator calls. Logged together as one DECISIONS.md entry to avoid log noise.
+3. **FastAPI skeleton is healthy.** 8/8 tests pass. The most important thing BE-01 did wasn't code — it locked the downstream patterns (error envelope, settings_dep, auth dep seam) that BE-02/03/04/05 plug into.
+
+**Operational lesson (extended file-sync-gap memory):** Backend agent hit a NEW variant of the file-sync bug — the `Edit` tool silently *truncated* multiple Python files it had just created via `Write` in the same session. Only caught by `pytest` returning `SyntaxError`. Updated `versawiki-file-sync-gap.md` memory with the stronger rule: spawned subagents should be told explicitly to use bash heredoc for ANY modification to an existing file, including files they themselves created earlier in the same run.
+
+**Next-session-equivalent plan (this session continues):**
+
+- Spawn Wave 3 in parallel: BE-02 (auth middleware on top of the seam), ING-01 (connector + 3 parser lifts), MCP-01a (privacy static checkers).
+- After integration: commit + push. If energy remains, Wave 4 = BE-03 (tenant schema provisioner) + ING-02 (chunker/embedder — net-new) + MCP-02 (signature collector).
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-22 (session wrap)
 
 **Josh's privacy-bar answer (verbatim, paraphrased for the log):** no customer names / figures / files / quotes cross the boundary; naming conventions / syntax / organizational structures / data relationships / procedures / generally applicable principles may cross. Captured in `DECISIONS.md` and in memory (`versawiki-privacy-boundary.md`).

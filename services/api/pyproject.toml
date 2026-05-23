@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "versawiki-api"
+version = "0.1.0"
+description = "Versawiki Query API + MCP-over-HTTP endpoint (modular monolith)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Versawiki team" }]
+
+# Runtime dependencies are pinned to the versions locked in
+# docs/architecture/stack.md and DECISIONS.md (2026-05-22 stack lock).
+# Minor-version flexibility is allowed; major-version moves require
+# a new DECISIONS.md entry.
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.30,<0.40",
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.4,<3",
+    "sqlalchemy>=2.0,<2.1",
+    "alembic>=1.13,<2",
+    "psycopg[binary]>=3.2,<4",
+    "redis>=5.0,<6",
+    "rq>=2.0,<3",
+    "pyjwt>=2.9,<3",
+    "argon2-cffi>=23.1,<24",
+    "httpx>=0.27,<0.29",
+    "structlog>=24.4,<26",
+    "anthropic>=0.40,<1",
+    "openai>=1.50,<2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "httpx>=0.27,<0.29",
+]
+dev = [
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+]
+
+[project.scripts]
+versawiki-api = "versawiki_api.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

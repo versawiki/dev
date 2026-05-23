@@ -4,38 +4,33 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Current milestone
 
-**M0 — Foundations.** Stack locked. v1 system design drafted. Landscape + ontology + prior-art research banked. Meta-MCP privacy boundary resolved. M1 backlog populated (20 tickets) and now unblocked.
+**M1 — Local-folder ingestion (headless).** M0 fully closed. FastAPI skeleton landed. DomainObservation contract locked. Prior code audited file-by-file.
 
-## Last session summary (2026-05-22)
+## Last session summary (2026-05-22, continuing)
 
-- Three commits queued locally on `main`:
-  - `1f65311` Bootstrap versawiki team office (18 files)
-  - `32273af` M0 first wave: stack locked, system design v1 drafted, prior-art audited (5 files)
-  - `095f465` Lock decisions, queue M1 backlog, update status (4 files)
-  - (next commit) Privacy decision + ticket refinement
-- Specialists spawned this session: Architect (M0-01, M0-02), Researcher (M0-03, M0-04, M0-05). Both returned coherent, mutually-corroborating output.
-- 7 decisions locked in `DECISIONS.md` including the new content-vs-pattern privacy boundary for the meta-MCP.
-- M1 backlog refined: 5 Backend tickets, 6 Ingestion tickets, 6 Meta-MCP tickets, 3 QA tickets.
-- Prior MCP-server repo mounted: `C:\Users\joshu\Downloads\project-mcp-server`. Quick snapshot: 20 Python files, server.py (18KB), tools/schema/parsers/config/deploy/utils/. Real audit scheduled next session.
+**Wave 2 (3 parallel specialists) returned and integrated:**
+
+- **Architect** wrote `docs/architecture/domain-observation-v1.md` (561 lines, 8 payload variants, discriminated union, all `frozen=True`, no free-form strings, numerics-as-buckets). Surfaced 5 open questions; Orchestrator accepted all 5 of his recommendations (reversible inside v1.x).
+- **Researcher** updated `docs/research/prior-art.md` with file-by-file audit of `C:\Users\joshu\Downloads\project-mcp-server` (27 files: 3 REUSE / 11 ADAPT / 13 REPLACE). Big surprise: prior MCPs are vector-RAG in name only — `embedding BYTEA` column never written, `sentence-transformers` commented out, search is pure `ILIKE`. Recorded as its own decision/observation in DECISIONS.md.
+- **Backend** built `services/api/` (FastAPI skeleton, OpenAPI export, 8/8 tests passing). Locked downstream patterns: error envelope, structlog-on-stderr, settings_dep, auth dep seam.
+
+**Repo is now at:** github.com/versawiki/dev (will push after this commit).
 
 ## In flight
 
-- (none — session wrapping)
+- (none — about to spawn Wave 3)
 
 ## Blockers awaiting Josh
 
-1. **GitHub push credential** — Bundle `versawiki-initial.bundle` delivered for one-off push from Josh's laptop. Ongoing pushes wait on a fine-grained PAT scoped to `versawiki/dev` (Contents: read/write); Josh will provide in a future session.
+- (none — token is in session memory; all decisions either locked or appropriately escalated and answered)
 
-## Resolved this session
+## Next intended action (this session)
 
-- Meta-MCP cross-tenant privacy bar (was the load-bearing blocker for M1-MCP path)
-- Prior MCP-server repo URL (now mounted)
+**Wave 3 — three more parallel specialists:**
 
-## Next intended action (next session — Orchestrator should spawn 3 in parallel)
-
-1. **Researcher** — `M0-06`: file-by-file audit of the now-mounted prior MCP repo. Update `docs/research/prior-art.md` with REUSE / ADAPT / REPLACE annotations.
-2. **Architect** — `M1-MCP-01`: write `docs/architecture/domain-observation-v1.md`, classifying every field of the event as PRINCIPLE or CONTENT per the privacy decision. Spawn `M1-MCP-01a` as sibling once contract is settled.
-3. **Backend** — `M1-BE-01`: FastAPI skeleton under `services/api/`. No dependency; can run in parallel.
+1. **Backend** — `M1-BE-02` API-key auth middleware. Drops into the dep seam BE-01 already left.
+2. **Ingestion** — `M1-ING-01` Connector interface + local-folder connector. Lifts 3 parser files from the prior repo per the M0-06 audit.
+3. **MCP-builder** — `M1-MCP-01a` Privacy static checkers. Implements the 5-stage pipeline specified in `domain-observation-v1.md` §5.
 
 ## Quick links
 
@@ -44,7 +39,10 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 - `BACKLOG.md` — what's ready, in flight, and done
 - `DECISIONS.md` — what we've locked and why
 - `AGENTS.md` — team roster and operating rules
+- `ARCHITECTURE-LAYOUT.md` — where everything lives in the repo
 - `docs/architecture/stack.md` — locked stack
 - `docs/architecture/v1.md` — v1 system design
-- `docs/research/*` — landscape, ontology, prior art
+- `docs/architecture/domain-observation-v1.md` — meta-MCP wire contract
+- `docs/research/*` — landscape, ontology, prior-art (now includes M0-06 real audit)
+- `services/api/` — FastAPI skeleton (BE-01)
 - `notes/*` — per-role working logs

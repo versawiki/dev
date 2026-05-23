@@ -6,6 +6,48 @@ The Orchestrator records decisions taken without escalating to Josh (per the day
 
 ---
 
+## 2026-05-22 — DomainObservation event schema design calls (accepted as locked)
+
+The Architect's `docs/architecture/domain-observation-v1.md` surfaced 5 design questions. All five were within day-or-two-rework or reversible-cheaply, so Orchestrator accepted the Architect's recommendations rather than escalate.
+
+**Decisions:**
+
+1. **`tenant_anon_id` = UUIDv4 issued at tenant provisioning.** Stored in the tenant's own schema (`vw_<slug>.tenants.anon_id`). The only mapping from `anon_id` back to the customer-facing tenant identity lives inside the tenant's own database; tenant deletion destroys it. Rejected HMAC-with-rotating-key because rotation breaks the longitudinal correlation the meta-MCP needs for skill-write thresholds.
+2. **Controlled vocabularies are baked into the Pydantic schema (Literal members) for v1.** Reject external `vocabulary.yaml`. Trading off vocabulary evolution velocity for type safety and review-via-diff. Re-evaluate if vocabularies grow beyond ~50 members per dimension.
+3. **Numerics cross only as buckets, ratios in [0,1], or low-resolution quantiles.** No raw counts ever. Static checker enforces. Differential-privacy on raw counts considered and rejected for v1 (the per-query privacy budget is hard to allocate sensibly when the meta-MCP queries cross many tenants).
+4. **`tenant_anon_id` stays on the envelope.** Correlation across observations from the same tenant is the trigger condition for `M1-MCP-03` skill-write; dropping it would make the meta-MCP signal-blind.
+5. **Audit-log retention = life-of-tenant + admin-endpoint delete.** Stored only in the tenant's own schema. Failed-check entries record `payload_hash + reason_code` only — never the offending payload itself.
+
+**Rationale:** Architect's recommendations were each grounded in versawiki's specific needs and each had a clear rollback path. Escalation cost (waking up Josh five times) exceeded the upside of his weighing in.
+
+**Made by:** Orchestrator.
+
+**Reversibility:** Each call is reversible inside v1.x of the DomainObservation schema (SemVer MINOR bump for additions; MAJOR for breaking changes). v2 would re-issue tenant_anon_ids and re-key historical observations via a translator.
+
+---
+
+## 2026-05-22 — Vector retrieval is genuinely net-new (M0-06 surprise)
+
+**Decision:** Versawiki's chunker + embedder + vector retrieval (`M1-ING-02`, `M1-BE-04/05`) cannot reuse the prior repo's embedding path. The prior code has the schema column (`document_embeddings.embedding BYTEA`) but never writes to it; `sentence-transformers` is commented out in `requirements.txt`; search is pure `ILIKE`. We build embedding + vector search from scratch.
+
+**Rationale:** M0-06 Researcher audit corrected M0-05's live-probe inference, which over-credited the prior code on this. The prior MCPs are vector-RAG in name only. ~30% of the assumed reuse evaporated.
+
+**Made by:** Orchestrator (recording a Researcher finding as a planning fact, not a new design choice).
+
+**Reversibility:** N/A — this is an observation about prior code, not a design call.
+
+**Impact on backlog:** `M1-ING-02` is now flagged as "fully net-new — no prior code to lift." Estimate for the ticket increases. The "ADAPT" bucket of file lifts (parsers, registry, drive_connector, ingest, context_builder) is still valid.
+
+---
+
+# Decision log
+
+Append-only. Newest at top. Each entry: date, decision, rationale, made-by, reversibility cost.
+
+The Orchestrator records decisions taken without escalating to Josh (per the day-or-two-rework rule). Josh's explicit decisions are recorded here too.
+
+---
+
 ## 2026-05-22 — Meta-MCP cross-tenant boundary = content-vs-pattern split
 
 **Decision:** The meta-MCP cross-tenant boundary is not a strict/loose binary. It is a taxonomy:
