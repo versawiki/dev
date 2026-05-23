@@ -71,17 +71,30 @@ def render_user_prompt(
     taxonomy_entries: Iterable[tuple[str, str]],
     *,
     source_uri: str = "",
+    catch_all_types: Iterable[str] = (),
 ) -> str:
     """Render the user prompt given parsed doc + taxonomy.
 
     `taxonomy_entries` is an iterable of `(name, description)` pairs. Order
     is preserved so the LLM sees the same options on every call against the
     same taxonomy (determinism).
+
+    `catch_all_types` is an iterable of type names that should be annotated
+    in the rendered list as the taxonomy's catch-all/fallback choices. When
+    a type's name appears in this set, its line is rendered as
+    ``- {name} (catch-all): {desc}`` instead of ``- {name}: {desc}``. This
+    makes the system-prompt promise ("pick the taxonomy's catch-all type —
+    it will be labelled as such") observable to the LLM. Empty / omitted is
+    the legacy behaviour: no annotation is added.
     """
+    catch_all_set = {n for n in catch_all_types if n}
     types_block_lines = []
     for name, description in taxonomy_entries:
         desc = description.strip().replace("\n", " ")
-        types_block_lines.append(f"- {name}: {desc}")
+        if name in catch_all_set:
+            types_block_lines.append(f"- {name} (catch-all): {desc}")
+        else:
+            types_block_lines.append(f"- {name}: {desc}")
     types_block = "\n".join(types_block_lines)
 
     full_text = parsed_doc.full_text or ""

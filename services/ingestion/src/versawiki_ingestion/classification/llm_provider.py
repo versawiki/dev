@@ -188,6 +188,7 @@ class AnthropicClassifier:
                 parsed_doc,
                 [(t.name, t.description) for t in taxonomy.list_types()],
                 source_uri=source_uri,
+                catch_all_types={taxonomy.default_type, taxonomy.unclassified_type},
             )
             payload = {
                 "model": self.model,
@@ -287,6 +288,7 @@ class OpenAIClassifier:
                 parsed_doc,
                 [(t.name, t.description) for t in taxonomy.list_types()],
                 source_uri=source_uri,
+                catch_all_types={taxonomy.default_type, taxonomy.unclassified_type},
             )
             payload = {
                 "model": self.model,
