@@ -2,6 +2,23 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — safe-list queue still fully clogged, tick N+1)
+
+**Status check:** Scanned BACKLOG.md overnight safe list: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`. None are in Done. All 4 have been implemented by prior ticks and have branches on `origin`:
+
+| Ticket    | Branch(es) on origin                                        | PR(s)   |
+|-----------|-------------------------------------------------------------|---------|
+| M1-MCP-05 | `vw-agent/M1-MCP-05-r2` (current, rebased on main), `-tick6`, `-rebased` | #22, #19, #13 |
+| M1-QA-01  | `vw-agent/M1-QA-01`, `-tick14`, `-rebased`                  | open    |
+| M1-QA-02  | `vw-agent/M1-QA-02`                                         | #5      |
+| M1-QA-03  | `vw-agent/M1-QA-03`                                         | #7      |
+
+**Test verification:** ran `pytest services/meta-mcp/tests/` on `vw-agent/M1-MCP-05-r2` — **193 passed, 1 skipped** (spaCy model absent, unchanged). Implementation solid.
+
+**Action taken:** No new PR or commit. Pushed pending bookkeeping note to `origin/vw-agent/M1-MCP-05-r2` to sync the branch. No duplicate work created.
+
+**Josh's action needed:** Merge the open PRs for M1-MCP-05 (#22 is the clean rebased one), M1-QA-01, M1-QA-02 (#5), M1-QA-03 (#7), then update BACKLOG.md to move those tickets to Done. Cron will unblock on next tick automatically. Stale duplicate PRs (#2, #3, #8, #9, #10, #13, #14, #15, #16, #17, #18, #19, #20) can be closed.
+
 ## 2026-05-23 (overnight cron — M1-MCP-05 rebased + PR #22 opened)
 
 **Picked:** M1-MCP-05 (per-tenant opt-out flag API + persistence) — topmost item in the overnight safe list.
