@@ -1,3 +1,89 @@
+## 2026-05-23 — M1-ING-05 wiki page builder (net-new, complete)
+
+Closes the end-to-end ingest -> query loop. After this lands a folder
+ingested via the local connector produces queryable wiki pages served
+by both `/v1/tenants/{tid}/pages/{page_id}` and the MCP `read_page`
+tool.
+
+### New package layout under `services/ingestion/src/versawiki_ingestion/pages/`
+
+- `models.py` — `WikiPage` (Pydantic v2 frozen) + `PageBuildJob`
+  aggregate. Fields: `id`, `tenant_id`, `ontology_node_id`, `title`,
+  `slug`, `summary`, `body_markdown`, `chunk_ids`, `related_page_ids`,
+  `created_at`, `updated_at`, `is_stale`, `version` (>=1),
+  `source_uri_count`, `predominant_doc_types`. `mark_stale()` /
+  `bump_version()` helpers respect the frozen-model contract.
+- `llm_writer.py` — `LLMPageWriter` Protocol + three impls:
+  - **`StubPageWriter`** — deterministic, network-free, used in every
+    test. Reads the chunks (so tests can assert it was called with
+    the right inputs) but never hits the network.
+  - **`AnthropicPageWriter`** — Claude Sonnet 4.5 via httpx; falls back
+    to the stub on any error or when no API key is configured.
+  - **`OpenAIPageWriter`** — gpt-4o-mini fallback, same fallback story.
+- `builder.py` — `PageBuilder` class. `build_for_node(node, chunks,
+  classifier_results, *, tenant_id, tree=None)` runs: rank chunks by
+  cosine to node centroid -> LLM title+summary -> render markdown body
+  (## Overview / ## Key documents / ## Related topics / ## Metadata) ->
+  derive `predominant_doc_types` + `source_uri_count`. Deterministic
+  for the stub writer; idempotence test pins the body-markdown sha256.
+- `pipeline.py` — `PageBuildPipeline.build_for_tree(tree, all_chunks,
+  classifier_results, tenant_id=...)`. Walks the tree roots-first BFS,
+  rolls small leaves up into their parents (threshold default 2 chunks,
+  tunable), builds pages, then runs a second pass to fill
+  `related_page_ids` from parent/sibling/child node ids (mapped through
+  `_stable_page_id(tenant_id, ontology_node_id)`). Persists via the
+  injected `PageStore`.
+- `staleness.py` — `StalenessEvent` (dataclass) +
+  `mark_stale_on_event(page, event)`. Three event flavours: chunk_added,
+  chunk_deleted, ontology_re_induced. Re-induced events flip every page
+  on the tenant. Cross-tenant events are no-ops. Already-stale pages
+  short-circuit (idempotent).
+- `store.py` — `PageStore` Protocol + `InMemoryPageStore` impl (used in
+  every test, asyncio.Lock-guarded for concurrent upsert) +
+  `PostgresPageStore` signature-only shell (real impl deferred to
+  BE-04-followup; raises NotImplementedError for now).
+
+### Materialisation strategy: stale-on-event
+
+Per `DECISIONS.md`, pages are written eagerly at ingest and the
+ingestion-event bus flips `is_stale=True` when underlying chunks /
+ontology change. The next reader gets a background rebuild (the API
+serves the stale page immediately with `Cache-Control: stale=true`)
+so reads never block. The hook is wired into the API via
+`versawiki_api.routers.v1.pages.set_rebuild_hook`; the ingestion side
+will install a real rebuilder later.
+
+### Tests added under `services/ingestion/tests/`
+
+- `test_page_builder_stub.py` — 5 tests.
+- `test_page_builder_threshold.py` — 4 tests.
+- `test_page_builder_idempotent.py` — 3 tests.
+- `test_page_pipeline_e2e.py` — 6 tests over a 3-level tree, 20 chunks.
+- `test_page_staleness.py` — 7 tests.
+- `test_page_store_inmemory.py` — 10 tests.
+
+### Test pass count
+
+```
+cd services/ingestion
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/vwpyc PYTHONDONTWRITEBYTECODE=1 \
+  python -m pytest -q tests/
+# 215 passed in 2.20s    (180 existing + 35 net-new)
+```
+
+### Contracts the API + future tickets depend on
+
+- `WikiPage.id` is deterministic for `(tenant_id, ontology_node_id)`.
+  Same tree -> same ids across re-induction; rebuilds bump `version`
+  and `updated_at`, never `id`.
+- `PageBuilder.build_for_node` is pure given its inputs + a fixed
+  `now`. Idempotence test pins the body-markdown hash.
+- `PageStore` protocol is duck-typed in both services (the API
+  re-declares it in `pages_store.py` to avoid the cross-service
+  import).
+- `mark_stale_on_event` is pure; callers persist the returned page.
+
+
 ## 2026-05-23 — M1-ING-04 ontology inducer (net-new, complete)
 
 Builds the layer that takes embedded `ChunkRecord`s and produces an

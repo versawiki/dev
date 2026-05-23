@@ -32,7 +32,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..auth.keys import ApiKey
-from ..deps import EmbeddingProvider
+from ..deps import EmbeddingProvider, PageStore
 from ..logging import get_logger
 from .schemas import TOOL_NAMES, tool_definitions
 from .tools import TOOL_HANDLERS, ToolError
@@ -131,6 +131,7 @@ async def _handle_tools_call(
     *,
     tenant_id: str,
     embedder: EmbeddingProvider,
+    page_store: PageStore | None = None,
 ) -> dict[str, Any]:
     """Dispatch a ``tools/call`` to the tool implementation.
 
@@ -189,6 +190,12 @@ async def _handle_tools_call(
                 arguments=arguments,
                 embedder=embedder,
             )
+        elif name == "read_page":
+            result = await handler(
+                tenant_id,
+                arguments=arguments,
+                page_store=page_store,
+            )
         else:
             result = await handler(tenant_id, arguments=arguments)
     except ToolError as exc:
@@ -223,6 +230,7 @@ async def _dispatch(
     *,
     tenant_id: str,
     embedder: EmbeddingProvider,
+    page_store: PageStore | None = None,
 ) -> dict[str, Any]:
     """Route a JSON-RPC request envelope to a method handler.
 
@@ -267,6 +275,7 @@ async def _dispatch(
             params,
             tenant_id=tenant_id,
             embedder=embedder,
+            page_store=page_store,
         )
 
     # ``notifications/initialized`` and similar one-way notifications:
@@ -312,6 +321,7 @@ async def handle_mcp_post(
     *,
     api_key: ApiKey,
     embedder: EmbeddingProvider,
+    page_store: PageStore | None = None,
 ) -> JSONResponse | StreamingResponse:
     """Top-level POST handler. Returns either JSON or an SSE stream."""
     try:
@@ -346,6 +356,7 @@ async def handle_mcp_post(
         body,
         tenant_id=api_key.tenant_id,
         embedder=embedder,
+        page_store=page_store,
     )
 
     if _wants_sse(request):

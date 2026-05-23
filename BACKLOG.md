@@ -6,7 +6,6 @@ Prioritized top-to-bottom within each section.
 
 **Ingestion**
 
-- `M1-ING-05 — Wiki page builder (Ingestion)` — Stale-on-event materialisation; one page per ontology node + per cluster. Flips `pages.get_page` from always-404 to a real lookup, activates BE-05's `read_page` MCP tool.
 - `M1-ING-06 — Query-driven re-indexing scheduler (Ingestion)`.
 
 **Meta-MCP**
@@ -47,6 +46,7 @@ Prioritized top-to-bottom within each section.
 
 ## Done
 
+- `M1-ING-05 — Wiki page builder (Ingestion)` — `services/ingestion/src/versawiki_ingestion/pages/`; 35 new tests (215 total) + 14 new in api (129 total). Stale-on-event materialisation. Pages route flipped from 404 to real lookup; MCP `read_page` now returns real data.
 - `M1-CS-01 — Customer support agent v1 (Support)` — `services/support-agent/`; 62 tests; safe/forbidden actions; PII redaction; cross-tenant block. Load-bearing tests: `test_cross_tenant_lookup_refused_and_audited_not_escalated`, `test_conversation_log_never_contains_cc_number`.
 - `M1-MCP-04 — Skill applier (MCP-builder)`.
 - `M1-ING-04 — Ontology inducer (Ingestion)`.

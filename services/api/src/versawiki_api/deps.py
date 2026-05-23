@@ -31,6 +31,7 @@ from .config import Settings, get_settings
 from .db.engine import SessionDep, get_session
 from .db.tenant_store import InMemoryTenantStore, TenantStore
 from .logging import get_logger
+from .pages_store import InMemoryPageStore, PageStore
 
 log = get_logger(__name__)
 
@@ -163,6 +164,34 @@ def get_embedding_provider(request: Request) -> EmbeddingProvider:
 EmbeddingProviderDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
 
 
+# ---------------------------------------------------------------------------
+# Page store (ING-05)
+# ---------------------------------------------------------------------------
+
+
+def set_page_store(app, store: PageStore) -> None:
+    """Install a :class:`PageStore` onto a FastAPI app's state."""
+    app.state.page_store = store
+
+
+def get_page_store(request: Request) -> PageStore:
+    """Return the request's wired :class:`PageStore`.
+
+    Defaults to a process-local :class:`InMemoryPageStore` when the
+    app didn't install one. Production replaces this with the
+    Postgres-backed impl via :func:`set_page_store` in ``create_app``.
+    """
+    store = getattr(request.app.state, "page_store", None)
+    if store is not None:
+        return store
+    store = InMemoryPageStore()
+    request.app.state.page_store = store
+    return store
+
+
+PageStoreDep = Annotated[PageStore, Depends(get_page_store)]
+
+
 __all__ = [
     "ApiKey",
     "StubApiKey",
@@ -179,11 +208,15 @@ __all__ = [
     "get_api_key_store",
     "get_current_tenant",
     "get_db_session",
+    "get_page_store",
     "get_tenant_store",
     "set_api_key_store",
+    "set_page_store",
     "settings_dep",
     "EmbeddingProvider",
     "EmbeddingProviderDep",
+    "PageStore",
+    "PageStoreDep",
     "get_embedding_provider",
     "set_embedding_provider",
 ]

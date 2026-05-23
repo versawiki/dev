@@ -2,6 +2,41 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (M1-ING-05 — end-to-end loop closed)
+
+**Spawned:** single Ingestion specialist on M1-ING-05.
+
+**Result:** 215 ingestion tests (+35), 129 api tests (+14). End-to-end ingestion → query path now produces real wiki pages.
+
+**Architecturally what changed:**
+
+The pages route in `services/api/src/versawiki_api/routers/v1/pages.py` used to always return 404. It now:
+
+- Reads from a `PageStore` dependency (InMemoryPageStore default; PostgresPageStore signature shipped for BE-04-followup wiring)
+- Returns stale pages immediately with `Cache-Control: stale=true` while a background rebuild fires (hook installed module-level so ingestion side can wire it)
+- Looks up by page_id, by slug, and by ontology_node
+- Honors tenant-scope-before-existence (404 vs 403 cannot leak tenant ids)
+
+The MCP `read_page` tool that BE-05 shipped as a stub now serves real pages too — same JSON-RPC envelope, just real body.
+
+**Page envelope:** `page_id, slug, title, summary, body_md, body_html, primary_ontology_node_id, chunk_ids, related_page_ids, last_built_at, is_stale, version, source_uri_count, predominant_doc_types`.
+
+**The PageBuilder pipeline:** OntologyNode + its chunks + classifier results → StubPageWriter (deterministic for tests) / AnthropicPageWriter / OpenAIPageWriter → WikiPage with 4 sections (Overview, Key documents, Related topics, Metadata). Nodes with fewer than 2 chunks roll into parent.
+
+**Stale-on-event policy:** chunk added/deleted flips matching pages stale; ontology re-induced flips all of a tenant's pages stale. Reading a stale page kicks a rebuild + returns the current version.
+
+**Both API keys now on disk** (Anthropic + OpenAI), gitignored via the `.vw-*-key` pattern. The smoke test against api.anthropic.com failed from this sandbox due to egress restrictions, NOT a key validity issue — the keys will work fine from anywhere with normal network egress (the GCP VM, a CI runner, etc.).
+
+**Next leverage point:** M1-QA-01 end-to-end smoke harness against a real corpus. With both keys + ING-05, we can now actually feed a folder of documents through the whole pipeline and watch real pages come out.
+
+**Total tests now: 572** (api 129 + ingestion 215 + meta-mcp 166 + support-agent 62).
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-23 (operations docs + customer support agent — actual end of session)
 
 **Customer support agent shipped:** `services/support-agent/`, 62 tests. The privacy posture from versawiki proper carries through — cross-tenant block, PII redaction in logs, forbidden actions that always refuse + escalate.

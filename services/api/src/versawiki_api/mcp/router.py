@@ -9,6 +9,8 @@ is just the HTTP-layer glue:
   (401 otherwise) and exposes the tenant id used by every tool call.
 - ``EmbeddingProviderDep`` injects the wired embedding provider so
   ``search`` can call it.
+- ``PageStoreDep`` injects the wired page store so ``read_page`` can
+  serve real pages (ING-05).
 
 There is no path-level ``tenant_id``. The MCP endpoint is a single URL
 per deployment; the tenant is resolved purely from the API key. This
@@ -22,7 +24,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from ..auth.middleware import CurrentApiKey
-from ..deps import EmbeddingProviderDep
+from ..deps import EmbeddingProviderDep, PageStoreDep
 from .transport import handle_mcp_post
 
 router = APIRouter()
@@ -50,11 +52,13 @@ async def mcp_post(
     request: Request,
     api_key: CurrentApiKey,
     embedder: EmbeddingProviderDep,
+    page_store: PageStoreDep,
 ) -> Response:
     return await handle_mcp_post(
         request,
         api_key=api_key,
         embedder=embedder,
+        page_store=page_store,
     )
 
 

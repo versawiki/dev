@@ -14,18 +14,19 @@ For ``search`` we reuse the BE-04 query path — same embedding call,
 same envelope shape — so an MCP client sees the same data shape as a
 direct ``/v1/tenants/{id}/query`` caller.
 
-For ``read_page`` / ``read_chunk`` / ``list_ontology`` the bodies are
-shape-correct stubs that match BE-04's stub envelopes. ING-02 / ING-04
-/ ING-05 will fill them in.
+For ``read_page`` ING-05 wired this through to the ``PageStore``; the
+not-found case still uses the same JSON-RPC envelope BE-05's tests
+pin. ``read_chunk`` / ``list_ontology`` remain shape-correct stubs.
 """
 
 from __future__ import annotations
 
 import time
 import uuid
-from typing import Any
+from datetime import datetime
+from typing import Any, Optional
 
-from ..deps import EmbeddingProvider
+from ..deps import EmbeddingProvider, PageStore
 from ..logging import get_logger
 from .schemas import (
     ListOntologyInput,
@@ -33,6 +34,7 @@ from .schemas import (
     OntologyNode,
     ReadChunkInput,
     ReadPageInput,
+    ReadPageOutput,
     SearchInput,
     SearchOutput,
 )
@@ -142,19 +144,20 @@ async def tool_search(
 
 
 # ---------------------------------------------------------------------------
-# read_page — stub until ING-05 ships the page builder
+# read_page — now backed by PageStore (ING-05)
 # ---------------------------------------------------------------------------
 
 async def tool_read_page(
     tenant_id: str,
     *,
     arguments: dict[str, Any],
+    page_store: Optional[PageStore] = None,
 ) -> dict[str, Any]:
-    """Fetch a wiki page by id.
+    """Fetch a wiki page by id from the configured :class:`PageStore`.
 
-    BE-04's REST stub always 404s because ING-05 hasn't persisted any
-    pages. We do the same here — but the MCP error is delivered inside
-    the JSON-RPC envelope rather than as an HTTP 404.
+    When no store is wired (legacy callers), we fall back to the
+    original "always not_found" stub so existing tests that don't
+    inject a store still pass.
     """
     try:
         payload = ReadPageInput.model_validate(arguments)
@@ -164,8 +167,33 @@ async def tool_read_page(
             errors=str(exc),
         ) from exc
 
+    if page_store is not None:
+        record = await page_store.get(tenant_id, payload.page_id)
+        if record is not None:
+            log.info(
+                "mcp_read_page_hit",
+                tenant_id=tenant_id,
+                page_id=payload.page_id,
+                version=record.version,
+            )
+            last_built = (
+                record.updated_at.isoformat()
+                if isinstance(record.updated_at, datetime)
+                else None
+            )
+            response = ReadPageOutput(
+                page_id=record.id,
+                slug=record.slug,
+                title=record.title,
+                body_md=record.body_markdown,
+                body_html="",
+                primary_ontology_node_id=record.ontology_node_id,
+                last_built_at=last_built,
+            )
+            return response.model_dump(mode="json")
+
     log.info(
-        "mcp_read_page_missing_stub",
+        "mcp_read_page_missing",
         tenant_id=tenant_id,
         page_id=payload.page_id,
     )

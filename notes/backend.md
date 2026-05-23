@@ -1,3 +1,116 @@
+## 2026-05-23 — M1-ING-05 follow-on: API + MCP page lookup flipped from stub to real
+
+Cross-service touch on the api package landed alongside the ingestion
+page-builder. Closes the loop: ingested pages are now served by the
+query API and the MCP `read_page` tool.
+
+### What changed in `services/api/`
+
+- `pages_store.py` — new module. `WikiPageRecord` (Pydantic v2 frozen,
+  field-for-field mirror of `versawiki_ingestion.pages.WikiPage`),
+  `PageStore` Protocol, `InMemoryPageStore` impl. Re-declared here to
+  preserve the no-runtime-import boundary between api and ingestion
+  packages (same approach `EmbeddingProvider` already uses in `deps.py`).
+- `deps.py` — added `get_page_store` / `set_page_store` / `PageStoreDep`.
+  Default factory: process-local `InMemoryPageStore` lazily attached to
+  `app.state.page_store`. Production wires `PostgresPageStore` via
+  `set_page_store` at startup.
+- `routers/v1/pages.py` — replaced the always-404 stub. New routes:
+  - `GET /tenants/{tid}/pages/{page_id}` — by id. Returns 404 with
+    `code=page_not_found` when missing; 200 with the wire envelope when
+    found; 200 + `Cache-Control: stale=true` + background rebuild when
+    the stored record is stale.
+  - `GET /tenants/{tid}/pages?slug=...` — by slug.
+  - `GET /tenants/{tid}/pages?ontology_node=...` — list pages for a
+    node. Either filter must be supplied; missing both -> 400
+    `missing_filter`.
+  - All three guard on the existing `resolve_tenant` cross-tenant
+    check, so a wrong-tenant key still gets 403 `tenant_scope_mismatch`
+    before any store access.
+  - Background-rebuild hook installed via `set_rebuild_hook(fn)`.
+    Tests use it to assert the rebuild fires; production will wire the
+    ingestion service's rebuilder.
+- `mcp/tools.py` — `tool_read_page` now accepts an optional
+  `page_store` kwarg, looks the page up there, and returns the
+  populated `ReadPageOutput` envelope when present. Backward-compatible
+  with the BE-05 test suite: when no store is wired (legacy callers)
+  it falls back to the original `not_found` behaviour.
+- `mcp/transport.py` — `_handle_tools_call` / `_dispatch` /
+  `handle_mcp_post` thread a `page_store: PageStore | None` through to
+  `tool_read_page`. The other tool handlers are untouched.
+- `mcp/router.py` — pulls `PageStoreDep` and passes it into
+  `handle_mcp_post`.
+
+### Envelope shape (pinned)
+
+`GET /v1/tenants/{tid}/pages/{page_id}` -> `WikiPage`:
+
+```
+{
+  "page_id": "pg_abc...",
+  "slug": "topic-a",
+  "title": "Topic A",
+  "summary": "...",
+  "body_md": "## Overview\n...",
+  "body_html": "",                  # reserved for UI-side render
+  "primary_ontology_node_id": "topic_a",
+  "chunk_ids": ["c1", ...],
+  "related_page_ids": ["pg_xyz...", ...],
+  "last_built_at": "2026-05-23T...",
+  "is_stale": false,
+  "version": 1,
+  "source_uri_count": 2,
+  "predominant_doc_types": ["rfi"]
+}
+```
+
+MCP `read_page` returns the existing BE-05 `ReadPageOutput` shape
+(unchanged); only the body becomes real when the store has the page.
+
+### Tests added under `services/api/tests/`
+
+- `test_v1_pages_route_real.py` — 10 tests: unknown id -> 404,
+  known id -> 200 + envelope, stale page -> 200 + Cache-Control +
+  background-rebuild fires, fresh page has no stale header,
+  cross-tenant -> 403 before existence check, no auth -> 401,
+  by-slug, by-slug empty, by-ontology-node, no-filter -> 400.
+- `test_mcp_tool_read_page_real.py` — 4 tests: known id ->
+  `ReadPageOutput` in JSON-RPC result, unknown id -> envelope
+  not_found, cross-tenant access refused via not_found (the tenant is
+  fixed by the API key, foreign pages resolve to None against the
+  caller's tenant scope), `tenant_id` in arguments -> -32602.
+
+Existing 115 BE-01-05 tests unchanged: the old
+`test_v1_pages_route.py` still passes (the missing-page path still
+returns the same structured 404 with the same code), and
+`test_mcp_tool_call_read_page.py` still passes (no store wired by
+that fixture, so the fallback path returns the same not_found
+envelope).
+
+### Test pass count
+
+```
+cd services/api
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/vwpyc PYTHONDONTWRITEBYTECODE=1 \
+  python -m pytest -q tests/
+# 129 passed, 2 skipped in 8.99s   (115 existing + 14 net-new)
+```
+
+### What future tickets need to know
+
+- `PostgresPageStore` in `versawiki_ingestion.pages.store` is signature
+  only. BE-04-followup must implement it and wire it through
+  `set_page_store(app, PostgresPageStore(session_factory))` in
+  `create_app`.
+- The rebuild hook is global (module-level singleton in
+  `routers/v1/pages.py`). When the ingestion service exposes a
+  rebuilder, install it once at app startup via `set_rebuild_hook(fn)`.
+- The wire envelope adds `summary`, `chunk_ids`, `related_page_ids`,
+  `is_stale`, `version`, `source_uri_count`, `predominant_doc_types`
+  on top of the BE-04 stub. UI/desktop clients regenerating from
+  OpenAPI will pick these up automatically.
+
+
 ## 2026-05-23 — M1-BE-05 done: MCP-over-HTTP endpoint
 
 **Result:** 115 tests pass, 2 skip cleanly. 21 new tests across the 6
