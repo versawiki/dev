@@ -72,16 +72,21 @@ def test_structural_count_above_max_rejected(envelope_of):
 
 
 def test_ratio_out_of_range_rejected(envelope_of):
-    """`branching_factor_p50` is in ALLOWED_RATIO_LEAVES; > 1.0 is RAW_NUMERIC."""
+    """`leaf_to_internal_ratio` is in ALLOWED_RATIO_LEAVES; > 1.0 is RAW_NUMERIC.
+
+    Note: branching_factor_p50/p95 are NOT ratio leaves (see spec §3.1 and
+    ALLOWED_BRANCHING_FACTOR_LEAVES in numeric.py) — they may legitimately
+    exceed 1.0.  This test uses `leaf_to_internal_ratio` as the offending field.
+    """
 
     env = envelope_of(
         {
             "kind": "ontology_shape",
             "depth": 4,
             "node_count_bucket": "51-200",
-            "branching_factor_p50": 2.5,
-            "branching_factor_p95": 0.7,
-            "leaf_to_internal_ratio": 0.75,
+            "branching_factor_p50": 3.0,   # valid branching factor (> 1 is fine)
+            "branching_factor_p95": 7.0,   # valid branching factor
+            "leaf_to_internal_ratio": 2.5,  # > 1.0 for a ratio → RAW_NUMERIC
             "kind_distribution": {"category": 12, "entity": 30, "topic": 8},
             "induced_vs_seed_ratio": 0.4,
         }
@@ -136,20 +141,12 @@ def test_structural_count_max_constant_is_1000():
     assert STRUCTURAL_COUNT_MAX == 1000
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Source bug: numeric.py classifies branching_factor_p50/p95 as ratios "
-        "in ALLOWED_RATIO_LEAVES, capping them at [0,1]. Per spec §3.1 these "
-        "are real branching factors (often >1 for typical trees). The "
-        "implementation is overly strict — not a privacy issue but blocks "
-        "legitimate principle-only data. Tracked in notes/mcp-builder.md."
-    ),
-    strict=True,
-)
 def test_branching_factor_above_one_should_pass(envelope_of):
     """Per spec §3.1, branching factor is a real-valued statistic, not a
-    ratio. A tree of branching factor 2.5 is principle-only data. The
-    numeric stage rejects it today; see xfail reason."""
+    ratio. A tree with branching factor 2.5 is principle-only data and must
+    pass the numeric stage. branching_factor_p50/p95 live in
+    ALLOWED_BRANCHING_FACTOR_LEAVES (not ALLOWED_RATIO_LEAVES) and are
+    capped only at STRUCTURAL_COUNT_MAX, not at 1.0."""
 
     env = envelope_of(
         {

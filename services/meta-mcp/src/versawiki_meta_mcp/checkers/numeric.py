@@ -44,12 +44,22 @@ STRUCTURAL_COUNT_MAX = 1000
 # numeric leaves. We match by terminal segment rather than full path so
 # we don't have to enumerate every payload variant explicitly.
 #
-# Two buckets:
-#  RATIO_LEAVES   — must be in [0.0, 1.0]
-#  COUNT_LEAVES   — must be int in [0, STRUCTURAL_COUNT_MAX)
-ALLOWED_RATIO_LEAVES: frozenset[str] = frozenset({
+# Three buckets:
+#  BRANCHING_FACTOR_LEAVES — non-negative real, < STRUCTURAL_COUNT_MAX (NOT capped at 1.0;
+#                            see spec §3.1 — these are tree shape stats, not probabilities)
+#  RATIO_LEAVES            — must be in [0.0, 1.0]
+#  COUNT_LEAVES            — must be int in [0, STRUCTURAL_COUNT_MAX)
+
+# Branching-factor quantile leaves.  Per spec §3.1 these are structural shape
+# statistics that can legitimately exceed 1.0 (a node with three children has
+# branching factor 3).  They are *not* ratios or probabilities.  We still cap
+# at STRUCTURAL_COUNT_MAX to guard against raw-count leakage.
+ALLOWED_BRANCHING_FACTOR_LEAVES: frozenset[str] = frozenset({
     "branching_factor_p50",
     "branching_factor_p95",
+})
+
+ALLOWED_RATIO_LEAVES: frozenset[str] = frozenset({
     "leaf_to_internal_ratio",
     "induced_vs_seed_ratio",
     "adherence_rate",
@@ -124,7 +134,23 @@ def scan_numeric_pattern(serialized: dict[str, Any]) -> CheckResult:
         leaf = _last_segment(json_path)
         parent = _parent_segment(json_path)
 
-        # Path A: ratio-typed leaves must be in [0, 1].
+        # Path A: branching-factor leaves — non-negative real, < STRUCTURAL_COUNT_MAX.
+        # These are structural shape statistics (not probabilities), so values > 1 are
+        # valid and expected for typical ontology trees.  See spec §3.1.
+        if leaf in ALLOWED_BRANCHING_FACTOR_LEAVES:
+            if isinstance(value, (int, float)) and 0.0 <= float(value) < STRUCTURAL_COUNT_MAX:
+                continue
+            return CheckResult(
+                stage=Stage.NUMERIC_PATTERN,
+                passed=False,
+                reason_code=ReasonCode.RAW_NUMERIC,
+                details=(
+                    f"branching-factor leaf `{leaf}` out of [0,{STRUCTURAL_COUNT_MAX})"
+                    f" at {json_path}"
+                ),
+            )
+
+        # Path B: ratio-typed leaves must be in [0, 1].
         if leaf in ALLOWED_RATIO_LEAVES:
             if isinstance(value, (int, float)) and 0.0 <= float(value) <= 1.0:
                 continue
@@ -135,7 +161,7 @@ def scan_numeric_pattern(serialized: dict[str, Any]) -> CheckResult:
                 details=f"ratio leaf `{leaf}` out of [0,1] at {json_path}",
             )
 
-        # Path B: structural-count leaves must be int in [0, STRUCTURAL_COUNT_MAX).
+        # Path C: structural-count leaves must be int in [0, STRUCTURAL_COUNT_MAX).
         if leaf in ALLOWED_COUNT_LEAVES:
             if leaf == "embedding_dim":
                 # Schema locks this to Literal[1024]; pass.
@@ -152,7 +178,7 @@ def scan_numeric_pattern(serialized: dict[str, Any]) -> CheckResult:
                 ),
             )
 
-        # Path C: dict-of-ints with a controlled-key parent.
+        # Path D: dict-of-ints with a controlled-key parent.
         if parent in ALLOWED_DICT_VALUE_COUNT_PARENTS:
             if isinstance(value, int) and 0 <= value < STRUCTURAL_COUNT_MAX:
                 continue
