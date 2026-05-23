@@ -120,3 +120,68 @@ The LLC shield can be set aside ("pierced") if a court finds you operated the co
 | **Total year-one ops** | **~$2000-3500** |
 
 Cost of NOT doing it: personal liability if a single customer has a single bad day. Worth it.
+
+---
+
+## Florida addendum (2026-05-23 — Josh chose Florida)
+
+Stripe Atlas defaults to Delaware and isn't the right pick for Florida. The cheapest, fastest Florida-native path:
+
+### 1. File Articles of Organization at Sunbiz.org — $125, ~15 minutes
+
+https://efile.sunbiz.org/llc_file.html
+
+Fields you'll fill in:
+- LLC name: `Versawiki LLC` (verify availability at https://search.sunbiz.org/Inquiry/CorporationSearch/ByName first)
+- Principal address: your home or a business address
+- Registered agent + agent address: either you (if you're OK with home address being public) or a service like Northwest Registered Agent ($125/yr; cheapest reliable option)
+- Members: just you for now (single-member LLC)
+- Manager-managed vs member-managed: pick **member-managed** for a one-person LLC
+- Effective date: leave blank for "immediately upon filing"
+
+Payment: $125 by credit card. Filing completes same day usually.
+
+### 2. EIN from IRS — $0, ~10 minutes
+
+https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online
+
+Has to be done by a "responsible party" (you, with your SSN). Form processes immediately for online filings; you get the EIN on the spot. Save the confirmation PDF.
+
+### 3. Florida annual report — $138.75/yr, due May 1
+
+https://efile.sunbiz.org/annual_report.html
+
+Set a calendar reminder. Late fee is $400 if you miss it. The first one is due the year AFTER you formed (so if you file in 2026, your first annual report is due May 1, 2027).
+
+### 4. Mercury bank account — $0, 1-3 days
+
+https://mercury.com — link the Sunbiz filing PDF + EIN PDF + your ID. Fully digital, opens within a few business days. No minimum balance, no monthly fees.
+
+Alternative: Brex (similar; more enterprise-y feel) or a local Florida bank if you want in-person access.
+
+### 5. Operating Agreement
+
+Florida doesn't require one to be filed with the state, but you should have one in the company records. Single-member templates are free at:
+- https://www.legalzoom.com/forms/single-member-llc-operating-agreement (free version exists; ignore the upsells)
+- Or copy-paste a vetted one from a startup-attorney blog
+
+Sign it, store with the company records (Dropbox folder, password-protected).
+
+### 6. (Optional but recommended) Florida sales tax registration
+
+If you'll sell SaaS to Florida customers, you may owe Florida sales tax on digital subscriptions in some configurations. Register at https://floridarevenue.com/taxes/registration/ — free. Talk to a Florida CPA about whether SaaS is taxable in your specific shape (rules vary).
+
+### Total cost Florida path (year 1)
+
+| Item | Cost |
+|---|---|
+| Sunbiz filing | $125 |
+| Registered agent | $125/yr (or $0 if you use your home address) |
+| EIN | $0 |
+| Florida annual report | $138.75/yr (starts year 2) |
+| Mercury banking | $0 |
+| QuickBooks | $30/mo = $360/yr |
+| **Total year 1** | **~$610 (or $485 if you self-registered-agent)** |
+| **vs. Stripe Atlas Delaware** | **~$1100 year 1** |
+
+Florida-direct saves you ~$500/yr ongoing and you stay in your home state for tax purposes (simpler filings).

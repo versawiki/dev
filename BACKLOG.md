@@ -24,9 +24,8 @@ Prioritized top-to-bottom within each section.
 
 **Operations (new — Josh-driven mostly)**
 
-- `OPS-01 — Cloudflare DNS migration` — Per `docs/operations/dns-cloudflare-migration.md`.
 - `OPS-02 — Apple Developer + Google Play accounts` — Per `docs/operations/app-store-prep.md`.
-- `OPS-03 — LLC + bank + EIN` — Per `docs/operations/llc-and-business.md`. Stripe Atlas recommended.
+- `OPS-03 — LLC + bank + EIN` — **Florida chosen.** File via Sunbiz.org ($125) + EIN from IRS (free) + Mercury bank account + registered agent. Skip Stripe Atlas (Delaware-only). See `docs/operations/llc-and-business.md` (Florida addendum).
 - `OPS-04 — Claude Agent SDK orchestrator on the GCP VM` — Per `docs/operations/agent-sdk-spec.md`. ~3 working days when ready.
 - `OPS-05 — Privacy policy + ToS + DPA drafts` — Termly/Iubenda templates, then lawyer review.
 - `OPS-06 — Production infrastructure (Fly + Neon + R2 accounts)` — Just-in-time before M1 deploy.
@@ -63,6 +62,7 @@ Prioritized top-to-bottom within each section.
 - `M1-BE-02 — API-key auth middleware (Backend)`.
 - `M1-BE-01 — FastAPI skeleton (Backend)`.
 - `M1-MCP-01 — DomainObservation event schema (Architect)`.
+- `OPS-01 — Cloudflare DNS migration` — Josh completed 2026-05-23; all 4 domains now on Cloudflare nameservers. Records + workers still to configure as services come online.
 - `M0-01..06 — All M0 tickets done`.
 
 ## Icebox
