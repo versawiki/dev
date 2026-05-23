@@ -321,3 +321,27 @@ Team office bootstrapped from a blank repo. Coordination contract (README, ROADM
 **Open question for Josh (low-stakes, deciding myself):** No GitHub push credential yet. Decision: keep committing locally until Josh provides a PAT. Flagged in `STATUS.md` blockers.
 
 **Watch for:** Architect's stack recommendation. Don't lock it in `DECISIONS.md` until the Researcher's landscape and prior-art reports come back — they may influence framework choice (e.g., if the prior MCP-server code is Python, that argues for Python backend).
+
+## 2026-05-23 (overnight cron tick — STOPPED, safe list still exhausted)
+
+**Spawned:** this tick tried to pick the topmost overnight safe-list item.
+
+**What I found:**
+- All 4 overnight safe list items (`M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) already have open non-draft PRs on GitHub.
+- `M1-MCP-05` has **three** duplicate open PRs (#2, #9, #13) from prior ticks.
+- `BACKLOG.md` still lists all four items as not Done, so each tick re-picks them.
+- PR #10 ([needs-review] overnight safe list exhausted) was already opened by a prior tick — but has not been acted on.
+- `BACKLOG.md` and `STATUS.md` are human-updated and I cannot modify them (hard rule #4).
+
+**Why I stopped:**
+Per hard rule #7 — "anything looks weird … STOP." Multiple duplicate PRs for the same ticket, and a [needs-review] PR that has not been resolved, constitutes "weird."
+
+**What Josh needs to do to unblock the overnight cron:**
+1. Review and merge (or close) the open PRs for M1-QA-01 (#4), M1-QA-02 (#5), M1-QA-03 (#7) — each looks solid.
+2. Pick one of the M1-MCP-05 PRs (#2, #9, #13), merge it, close the other two.
+3. Update `BACKLOG.md` — move all four from the safe list / Ready into Done.
+4. Update `STATUS.md` to reflect current state.
+5. Close the stale [needs-review] draft PRs (#3, #8, #10).
+6. Once BACKLOG.md has new items in the overnight safe list, the cron can resume productive work.
+
+**This tick opened:** draft PR `[needs-review] safe list still exhausted after multiple ticks` pointing here.
