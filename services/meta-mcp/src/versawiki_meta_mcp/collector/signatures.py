@@ -128,12 +128,12 @@ def compute_ontology_shape(
     return OntologyShape(
         depth=min(raw.depth, 64),
         node_count_bucket=name_bucket(raw.node_count, buckets.count_10_1000plus),  # type: ignore[arg-type]
-        # Branching factor checker note: in current pipeline ratios are
-        # capped at [0,1]; pending the fix tracked in mcp-builder notes
-        # we clamp to satisfy the static checker. The schema itself
-        # allows >1 — see the xfail in test_pipeline_numeric.
-        branching_factor_p50=_clamp01(bf_p50),
-        branching_factor_p95=_clamp01(bf_p95),
+        # Per spec §3.1, branching factors are real-valued shape statistics
+        # (not probabilities), so values > 1 are normal for real trees.
+        # Do NOT clamp to [0,1] — the numeric checker's ALLOWED_BRANCHING_FACTOR_LEAVES
+        # path already enforces [0, STRUCTURAL_COUNT_MAX).
+        branching_factor_p50=max(0.0, bf_p50),
+        branching_factor_p95=max(0.0, bf_p95),
         leaf_to_internal_ratio=leaf_ratio,
         kind_distribution=dict(raw.kind_distribution),
         induced_vs_seed_ratio=induced_ratio,
