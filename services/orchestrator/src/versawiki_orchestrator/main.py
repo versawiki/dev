@@ -22,6 +22,7 @@ import structlog
 import uvicorn
 
 from .agent import AgentRunner
+from .auto_merge import AutoMerger
 from .audit import AuditLog
 from .config import Settings, load_settings
 from .control import ControlState, build_control_app
@@ -154,6 +155,45 @@ async def _run_one_event(
         )
 
 
+async def run_auto_merger(
+    *,
+    settings: Settings,
+    audit: AuditLog,
+    boot_id: str,
+) -> None:
+    """Background task: poll the orchestrator's own open PRs and merge
+    them when safe.
+
+    One audit row per PR per cycle, event_type=`auto_merge_decision`.
+    Runs forever; cancel it via task.cancel().
+    """
+    if not settings.auto_merge_enabled:
+        audit.append("auto_merge_disabled", {"reason": "settings"})
+        return
+    merger = AutoMerger(settings=settings, audit=audit, run_id=boot_id)
+    while True:
+        try:
+            open_prs = await merger.list_open_agent_prs()
+            for pr_number in open_prs:
+                decision = await merger.evaluate_and_merge(pr_number)
+                audit.append(
+                    "auto_merge_decision",
+                    {
+                        "pr_number": decision.pr_number,
+                        "merged": decision.merged,
+                        "reason": decision.reason,
+                        "summary": decision.summary[:500],
+                        "head_sha": decision.head_sha,
+                    },
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — never let the poller die
+            _log.exception("auto_merger_cycle_failed", error=str(exc))
+            audit.append("auto_merge_cycle_failed", {"error": repr(exc)})
+        await asyncio.sleep(settings.auto_merge_poll_seconds)
+
+
 async def amain(settings: Settings | None = None) -> int:
     """The async entrypoint. Returns an exit code."""
     _setup_logging()
@@ -216,6 +256,12 @@ async def amain(settings: Settings | None = None) -> int:
         run_tick_scheduler(channel, interval_seconds=settings.tick_interval_seconds),
         name="tick-scheduler",
     )
+    import uuid as _uuid
+    boot_id = _uuid.uuid4().hex[:12]
+    auto_merge_task = asyncio.create_task(
+        run_auto_merger(settings=settings, audit=audit, boot_id=boot_id),
+        name="auto-merger",
+    )
     uvicorn_config = uvicorn.Config(
         app,
         host=settings.control_api_host,
@@ -265,9 +311,10 @@ async def amain(settings: Settings | None = None) -> int:
     # Tear down.
     channel.close()
     tick_task.cancel()
+    auto_merge_task.cancel()
     server.should_exit = True
     consume_task.cancel()
-    for t in (tick_task, server_task, consume_task):
+    for t in (tick_task, server_task, consume_task, auto_merge_task):
         try:
             await asyncio.wait_for(t, timeout=10.0)
         except (asyncio.CancelledError, asyncio.TimeoutError):

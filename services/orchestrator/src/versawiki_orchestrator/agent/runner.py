@@ -14,6 +14,8 @@ imports.
 from __future__ import annotations
 
 import asyncio
+import re
+import subprocess
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -29,6 +31,16 @@ from ..spending import SpendDecision, SpendingTracker
 
 
 _log = structlog.get_logger("versawiki_orchestrator.agent")
+
+
+# Used in _do_run to recover the PR URL from the agent's free-form summary
+# in the (common) case the agent opens the PR itself with `curl` rather
+# than going through the orchestrator's pr_callback.
+_PR_URL_RE = re.compile(r"https://github\.com/[^\s)\]]+/pull/\d+")
+
+# Heuristic: "ticket id" looks like M3-OPS-04 or M2-SUP-07a-fix. We use
+# the first match in the agent's prompt to short-circuit duplicate runs.
+_TICKET_ID_RE = re.compile(r"M\d+-[A-Z]+-\d+[a-z]?(?:-fix)?")
 
 
 # The orchestrator's system prompt. Distilled from the cron's overnight
@@ -179,12 +191,19 @@ class AgentRunner:
 
         result.finished_at_ns = time.time_ns()
 
-        # Record spend (estimated from token totals reported by the SDK).
-        spend_usd = self._spending.estimate_usd(
-            result.model_used or self._settings.model,
-            result.input_tokens,
-            result.output_tokens,
-        )
+        # Record spend. Prefer the SDK-reported dollar figure when we
+        # have one (much more accurate than estimating from tokens since
+        # it factors in cache hits, tool tokens, etc.). Fall back to the
+        # token-based estimate when the SDK didn't tell us.
+        sdk_cost = float(result.extras.get("cost_usd_from_sdk") or 0.0)
+        if sdk_cost > 0:
+            spend_usd = sdk_cost
+        else:
+            spend_usd = self._spending.estimate_usd(
+                result.model_used or self._settings.model,
+                result.input_tokens,
+                result.output_tokens,
+            )
         self._spending.record(
             amount_usd=spend_usd,
             model=result.model_used or self._settings.model,
@@ -218,6 +237,31 @@ class AgentRunner:
 
     async def _do_run(self, event: OrchestratorEvent, result: RunResult) -> None:
         """The actual SDK call. Lazy-imports so tests can run without the SDK."""
+        # Skip-if-branch-exists guard. If the agent has already worked on
+        # this ticket in a previous run (branch present in the local repo
+        # workdir), don't fire the SDK again — let the previous PR get
+        # reviewed / merged first.
+        prompt_text = event.to_prompt()
+        ticket_match = _TICKET_ID_RE.search(prompt_text)
+        if ticket_match is not None:
+            ticket_id = ticket_match.group(0)
+            existing_branch = self._find_existing_agent_branch(ticket_id)
+            if existing_branch is not None:
+                self._audit.append(
+                    "run_skipped_duplicate_branch",
+                    {
+                        "run_id": result.run_id,
+                        "event_id": event.event_id,
+                        "ticket_id": ticket_id,
+                        "branch": existing_branch,
+                    },
+                )
+                result.success = False
+                result.summary = "branch already exists"
+                result.error = "duplicate_branch"
+                result.branch = existing_branch
+                return
+
         # The SDK is imported lazily — keeps `pytest` collection cheap and
         # lets us stub it out in unit tests.
         try:
@@ -246,10 +290,11 @@ class AgentRunner:
         summary_parts: list[str] = []
         input_tokens = 0
         output_tokens = 0
+        cost_usd: float = 0.0
         last_branch: str | None = None
 
         async with ClaudeSDKClient(options=options) as client:
-            await client.query(event.to_prompt())
+            await client.query(prompt_text)
             async for message in client.receive_response():
                 # Collect text from assistant turns into the summary.
                 if isinstance(message, AssistantMessage):
@@ -258,8 +303,10 @@ class AgentRunner:
                             summary_parts.append(block.text)
                 # The SDK's ResultMessage carries token totals + final status.
                 if isinstance(message, ResultMessage):
-                    input_tokens = int(getattr(message, "input_tokens", 0) or 0)
-                    output_tokens = int(getattr(message, "output_tokens", 0) or 0)
+                    tokens = _extract_tokens(message)
+                    input_tokens = tokens[0]
+                    output_tokens = tokens[1]
+                    cost_usd = _extract_cost_usd(message)
 
         # Tail of the summary is the agent's closing paragraph; everything
         # before is intermediate reasoning we don't need to persist.
@@ -267,25 +314,70 @@ class AgentRunner:
         result.summary = summary.strip()[:8000]
         result.input_tokens = input_tokens
         result.output_tokens = output_tokens
+        if cost_usd > 0:
+            # Stash directly so the spending tracker can use the real
+            # SDK-reported figure instead of estimating from tokens.
+            result.extras["cost_usd_from_sdk"] = round(cost_usd, 6)
 
-        # If a callback is wired in, ask it to push + open PR. The runner
-        # itself doesn't know how to git push — that lives in
-        # `versawiki_orchestrator.github`.
+        # Look for a PR URL the agent might have included in its summary
+        # (the agent often opens PRs itself via curl, bypassing the
+        # callback). If we find one, success is True regardless of
+        # whether the callback ran.
+        url_match = _PR_URL_RE.search(result.summary)
+        if url_match is not None:
+            result.pr_url = url_match.group(0)
+            result.success = True
+
+        # Still try the callback if one is wired in (it's a no-op /
+        # logger in observe mode). Don't gate success on it.
         if self._pr_callback is not None:
-            # Convention: the agent committed on a branch named after the
-            # ticket, in the working clone. The callback walks git to find
-            # it. We pass the summary so the PR body uses the agent's own
-            # words.
             try:
                 pr_url = await self._pr_callback(last_branch or "", result.summary)
-                result.pr_url = pr_url
-                result.success = pr_url is not None
+                if pr_url and not result.pr_url:
+                    result.pr_url = pr_url
+                    result.success = True
             except Exception as exc:  # noqa: BLE001
-                result.success = False
-                result.error = f"pr_callback_failed:{exc!r}"
-        else:
-            # Observation mode: report success based on the agent's report.
+                if not result.success:
+                    result.error = f"pr_callback_failed:{exc!r}"
+        elif not result.success:
+            # Observation mode + no PR URL extracted: success rides
+            # on the agent producing any summary at all.
             result.success = bool(result.summary)
+
+    # ------------------------------------------------------------------
+    # Skip-if-branch-exists helper
+    # ------------------------------------------------------------------
+
+    def _find_existing_agent_branch(self, ticket_id: str) -> str | None:
+        """Return `vw-agent/<ticket_id>...` if such a local branch exists.
+
+        Inspects the configured `repo_workdir` via `git branch --list`.
+        Anything we can't introspect (no git dir, command error, etc.)
+        returns None so the guard is best-effort and never blocks a
+        first-time run.
+        """
+        repo = self._settings.repo_workdir
+        if not repo or not Path(repo).exists():
+            return None
+        pattern = f"vw-agent/*{ticket_id}*"
+        try:
+            proc = subprocess.run(
+                ["git", "branch", "--list", pattern],
+                cwd=str(repo),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if proc.returncode != 0:
+            return None
+        for line in (proc.stdout or "").splitlines():
+            name = line.strip().lstrip("*").strip()
+            if name.startswith("vw-agent/") and ticket_id in name:
+                return name
+        return None
 
     # ------------------------------------------------------------------
     # Helpers for tests
@@ -294,3 +386,43 @@ class AgentRunner:
     @staticmethod
     def system_prompt() -> str:
         return ORCHESTRATOR_SYSTEM_PROMPT
+
+
+def _extract_tokens(message: Any) -> tuple[int, int]:
+    """Pull (input_tokens, output_tokens) out of a ResultMessage.
+
+    The SDK's ResultMessage carries usage as a dict, e.g.
+        message.usage = {"input_tokens": ..., "output_tokens": ...}
+    Older / forked SDKs may attach them as attributes, or expose a usage
+    object instead. Try each shape, falling back to 0.
+    """
+    # Shape 1: `.usage` dict.
+    usage = getattr(message, "usage", None)
+    if isinstance(usage, dict):
+        return (
+            int(usage.get("input_tokens") or 0),
+            int(usage.get("output_tokens") or 0),
+        )
+    # Shape 2: `.usage` object with attributes.
+    if usage is not None:
+        in_t = getattr(usage, "input_tokens", None)
+        out_t = getattr(usage, "output_tokens", None)
+        if in_t is not None or out_t is not None:
+            return (int(in_t or 0), int(out_t or 0))
+    # Shape 3: attributes directly on the message (very old SDKs / mocks).
+    in_t = getattr(message, "input_tokens", None)
+    out_t = getattr(message, "output_tokens", None)
+    if in_t is not None or out_t is not None:
+        return (int(in_t or 0), int(out_t or 0))
+    return (0, 0)
+
+
+def _extract_cost_usd(message: Any) -> float:
+    """Return the SDK-reported dollar cost, or 0 if not present."""
+    cost = getattr(message, "total_cost_usd", None)
+    if cost is None:
+        return 0.0
+    try:
+        return float(cost)
+    except (TypeError, ValueError):
+        return 0.0
