@@ -6,6 +6,25 @@ The Orchestrator records decisions taken without escalating to Josh (per the day
 
 ---
 
+## 2026-05-22 — Meta-MCP cross-tenant boundary = content-vs-pattern split
+
+**Decision:** The meta-MCP cross-tenant boundary is not a strict/loose binary. It is a taxonomy:
+
+- **MUST NOT cross** (treated as customer property): customer-specific names, figures, files, file names, file content excerpts, quotes (verbatim or near-verbatim). Plagiarism risk + privacy.
+- **MAY cross** (treated as learned, generalizable knowledge): naming conventions, syntax patterns, organizational structures, data relationships, procedures, and other generally applicable properties of a data set or learned relationships within data.
+
+Customers may opt out of even principle-sharing.
+
+**Rationale:** Josh's call. Positioning-load-bearing: the customer pitch becomes "your *content* never leaves your tenant; only the *shapes you taught us* improve the product for everyone." Harder to engineer than strict-signatures-only — requires PII/NER redaction + quote detection + numeric-pattern detection as static checkers before any `DomainObservation` event leaves the tenant boundary and before any meta-MCP-authored skill markdown is committed. Preserves meaningful cross-customer learning value.
+
+**Made by:** Josh.
+
+**Reversibility:** Tightening later (removing things from the "may cross" list) = trivial. Loosening later (adding things) = potentially a credibility breach if customers were promised the stricter version. Bias toward stricter when ambiguous.
+
+**Impact on backlog:** Ticket `M1-MCP-01` (DomainObservation event schema) is unblocked and must explicitly classify each field as principle-vs-content. Static-checker work (PII/NER + numeric pattern + quote detection) becomes a sibling ticket `M1-MCP-01a`.
+
+---
+
 ## 2026-05-22 — Tech stack locked in (M0-01)
 
 **Decision:** Python 3.12 + FastAPI 0.115 backend. Postgres 16 + pgvector 0.8 (same DB) with HNSW indexes. Next.js 15 (App Router) web. Tauri 2 desktop. Expo SDK 52 mobile. Redis 7 + RQ workers. Anthropic primary / OpenAI secondary for LLM access, behind an `LLMProvider` interface. Fly.io + Neon + Cloudflare R2 for hosting.
@@ -111,7 +130,7 @@ The Orchestrator records decisions taken without escalating to Josh (per the day
 
 **Decision:** The team commits to `github.com/versawiki/dev`, branch `main`. Git is split: git-dir at `/tmp/vw_git`, work-tree at the workspace mount (Cowork mount blocks normal `.git` operations).
 
-**Rationale:** Josh wants real version history and the ability to review work from mobile. Empty repo confirmed on GitHub. Push credential pending.
+**Rationale:** Josh wants real version history and the ability to review work from mobile. Empty repo confirmed on GitHub. Push credential pending — for the initial bundle, Josh pushes from his laptop; ongoing pushes via a fine-grained PAT that Josh provides in a later session.
 
 **Made by:** Josh.
 

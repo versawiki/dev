@@ -4,32 +4,38 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Current milestone
 
-**M0 — Foundations.** Stack locked. v1 system design drafted. Landscape + ontology + prior-art research banked. M1 backlog populated (17 tickets).
+**M0 — Foundations.** Stack locked. v1 system design drafted. Landscape + ontology + prior-art research banked. Meta-MCP privacy boundary resolved. M1 backlog populated (20 tickets) and now unblocked.
 
 ## Last session summary (2026-05-22)
 
-- Repo bootstrap committed: `1f65311` (18 files, the team coordination contract).
-- First-wave specialists spawned in parallel:
-  - **Architect** produced `docs/architecture/stack.md` and `docs/architecture/v1.md`. Headline picks: Python+FastAPI / Postgres+pgvector / Next.js / Tauri / Expo / Anthropic+OpenAI / Fly+Neon+R2.
-  - **Researcher** produced `docs/research/landscape.md` (13-product survey), `docs/research/ontology.md` (recommended M1 pipeline), `docs/research/prior-art.md` (live probes against the four `project-docs-*` MCPs; ~70% reusable shape).
-- Orchestrator locked in 6 new decisions in `DECISIONS.md` (stack, tenant isolation, MCP transport, embedding plumbing, ontology pipeline, smaller-bundle calls).
-- M1 backlog populated: 5 Backend tickets, 6 Ingestion tickets, 4 Meta-MCP tickets, 2 QA tickets.
+- Three commits queued locally on `main`:
+  - `1f65311` Bootstrap versawiki team office (18 files)
+  - `32273af` M0 first wave: stack locked, system design v1 drafted, prior-art audited (5 files)
+  - `095f465` Lock decisions, queue M1 backlog, update status (4 files)
+  - (next commit) Privacy decision + ticket refinement
+- Specialists spawned this session: Architect (M0-01, M0-02), Researcher (M0-03, M0-04, M0-05). Both returned coherent, mutually-corroborating output.
+- 7 decisions locked in `DECISIONS.md` including the new content-vs-pattern privacy boundary for the meta-MCP.
+- M1 backlog refined: 5 Backend tickets, 6 Ingestion tickets, 6 Meta-MCP tickets, 3 QA tickets.
+- Prior MCP-server repo mounted: `C:\Users\joshu\Downloads\project-mcp-server`. Quick snapshot: 20 Python files, server.py (18KB), tools/schema/parsers/config/deploy/utils/. Real audit scheduled next session.
 
 ## In flight
 
-- (none — awaiting Josh's input before spawning the next wave)
+- (none — session wrapping)
 
 ## Blockers awaiting Josh
 
-1. **Meta-MCP cross-tenant privacy bar** — strict (no raw text or labels cross the tenant boundary; only anonymized structural signatures) vs. loose (labels can cross, better cross-customer learning). Both specialists flagged this independently. It shapes the M1 logging schema and the `DomainObservation` event contract (ticket `M1-MCP-01`), so we can't build the meta-MCP path until this is settled. Orchestrator's recommendation: **strict for v1, opt-in loosening later for enterprise tenants who explicitly consent.**
-2. **Prior MCP-server repo URL** — Researcher's `M0-05` was constrained to probing the live MCP tools and reading the `domain-expert-mcps` skill. To do a real code-reuse audit, we need the repo URL. Required filename patterns are at the end of `docs/research/prior-art.md`.
-3. **GitHub push credential** — Personal Access Token or connected GitHub MCP. Until then, commits stack up locally on the work-tree and are not visible on `github.com/versawiki/dev`.
+1. **GitHub push credential** — Bundle `versawiki-initial.bundle` delivered for one-off push from Josh's laptop. Ongoing pushes wait on a fine-grained PAT scoped to `versawiki/dev` (Contents: read/write); Josh will provide in a future session.
 
-## Next intended action (after Josh unblocks)
+## Resolved this session
 
-- **If Josh confirms "strict" privacy bar:** spawn Architect again to write `docs/architecture/domain-observation-v1.md` (the wire contract that crosses the tenant->meta boundary). Parallel: spawn Backend to begin `M1-BE-01` (FastAPI skeleton) since that has no privacy-bar dependency.
-- **If Josh provides the prior repo URL:** spawn Researcher to do a real code audit and update `docs/research/prior-art.md`.
-- **If Josh provides the GitHub push credential:** Orchestrator runs `git push origin main` and stops accumulating local commits.
+- Meta-MCP cross-tenant privacy bar (was the load-bearing blocker for M1-MCP path)
+- Prior MCP-server repo URL (now mounted)
+
+## Next intended action (next session — Orchestrator should spawn 3 in parallel)
+
+1. **Researcher** — `M0-06`: file-by-file audit of the now-mounted prior MCP repo. Update `docs/research/prior-art.md` with REUSE / ADAPT / REPLACE annotations.
+2. **Architect** — `M1-MCP-01`: write `docs/architecture/domain-observation-v1.md`, classifying every field of the event as PRINCIPLE or CONTENT per the privacy decision. Spawn `M1-MCP-01a` as sibling once contract is settled.
+3. **Backend** — `M1-BE-01`: FastAPI skeleton under `services/api/`. No dependency; can run in parallel.
 
 ## Quick links
 

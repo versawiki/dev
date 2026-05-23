@@ -2,7 +2,23 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
-## 2026-05-22 (end of session)
+## 2026-05-22 (session wrap)
+
+**Josh's privacy-bar answer (verbatim, paraphrased for the log):** no customer names / figures / files / quotes cross the boundary; naming conventions / syntax / organizational structures / data relationships / procedures / generally applicable principles may cross. Captured in `DECISIONS.md` and in memory (`versawiki-privacy-boundary.md`).
+
+**Prior MCP repo:** Mounted from `C:\Users\joshu\Downloads\project-mcp-server`. Quick snapshot looks like a Python+Docker MCP server — 20 .py files, server.py at 18KB, dirs match the live-probes' inferences (parsers, schema, tools, config, deploy). Researcher to do a real audit next session as `M0-06`.
+
+**GitHub:** No PAT yet. Bundle `versawiki-initial.bundle` delivered to Josh's outputs folder along with `PUSH-TO-GITHUB.md` instructions. He'll push from laptop; will provide a PAT in a future session for ongoing pushes.
+
+**Sessions's net new decisions:** 1 (the privacy boundary). All other decisions were already locked earlier in the session.
+
+**Backlog refined:** Added M1-MCP-01a (privacy static checkers), M1-MCP-05 (per-tenant opt-out), M1-QA-03 (privacy-boundary property tests). M0-06 (prior repo audit) is now top of Ready.
+
+**Next session plan:** Orchestrator should immediately spawn three specialists in parallel — Researcher (M0-06), Architect (M1-MCP-01), Backend (M1-BE-01) — none of which block each other. After they return: Orchestrator reconciles, queues the next wave (likely Ingestion ING-01 + Backend BE-02), and reports.
+
+---
+
+## 2026-05-22 (end of first integration)
 
 **Spawned and integrated:** Architect (M0-01, M0-02) + Researcher (M0-03, M0-04, M0-05) in parallel.
 
@@ -17,22 +33,11 @@ _The Orchestrator's running diary. Read top entry before deciding what to spawn.
 - Ontology pipeline: reimplement light on top of pgvector; no GraphRAG wholesale adoption.
 - No graph DB, no fine-tuning, AEC starter taxonomy in M1.
 
-**Escalating to Josh (rework cost > day-or-two):**
+**Escalated to Josh:**
 
-- Meta-MCP cross-tenant privacy bar (strict vs loose). Shapes M1 logging schema and is positioning-load-bearing. My recommendation: strict for v1.
-
-**Other asks for Josh (unblockers, not decisions):**
-
-- Prior MCP-server repo URL — for Researcher's real code audit.
-- GitHub push credential — local commits accumulating.
-
-**M1 backlog queued:** 17 tickets. Critical path: BE-01 (skeleton) -> BE-02/03 (auth, schema) -> ING-01/02 (connector, embed) -> ING-03/04 (classify, ontology) -> ING-05 (pages) -> BE-04/05 (query API, MCP endpoint). MCP-01 (DomainObservation contract) is the highest-leverage single ticket and is blocked until the privacy bar decision.
-
-**Watch for next session:**
-
-- If Josh confirms strict privacy bar: spawn Architect for `domain-observation-v1.md` AND Backend for BE-01 in parallel.
-- If Josh provides prior repo URL: spawn Researcher for the audit BEFORE writing any ingestion code that overlaps the prior MCPs' patterns.
-- If credential lands: push the accumulated commits.
+- Meta-MCP cross-tenant privacy bar — answered (see top entry).
+- Prior MCP-server repo URL — answered (see top entry).
+- GitHub push credential — bundle workflow set up; PAT later.
 
 **Operational lesson learned (saved to memory):** Cowork's Write/Edit tools overwrite files in a way that doesn't propagate to the bash mount git uses. Always use bash heredoc for edits to existing files; reserve the Cowork file tools for new-file creation.
 
