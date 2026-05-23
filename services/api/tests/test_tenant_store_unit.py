@@ -7,6 +7,7 @@ Real Postgres is not required. These tests exercise:
 - The admin route inserts a record and the subsequent ``get_tenant``
   hits it (the BE-01 ticket left this 404; BE-03 fixes it).
 - ``list_tenants`` paginates.
+- The M1-MCP-05 opt-out flag default + ``set_opt_out`` semantics.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ from fastapi.testclient import TestClient
 from versawiki_api.db.tenant_store import (
     InMemoryTenantStore,
     TenantAlreadyExistsError,
+    TenantRecord,
+    _strip_password,
 )
 
 
@@ -69,6 +72,92 @@ async def test_in_memory_store_get_by_slug() -> None:
     assert fetched is not None
     assert fetched.slug == "acme"
     assert await store.get_by_slug("never-existed") is None
+
+
+# ---------------------------------------------------------------------------
+# M1-MCP-05 — opt-out flag
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_defaults_opt_out_to_false() -> None:
+    store = InMemoryTenantStore()
+    record = await store.create(slug="acme", display_name="Acme Inc")
+    assert record.opt_out_signature_sharing is False
+    # And the read path agrees.
+    fetched = await store.get(record.id)
+    assert fetched is not None
+    assert fetched.opt_out_signature_sharing is False
+
+
+@pytest.mark.asyncio
+async def test_set_opt_out_true_then_get_returns_true() -> None:
+    store = InMemoryTenantStore()
+    record = await store.create(slug="acme", display_name="Acme Inc")
+    updated = await store.set_opt_out(record.id, opt_out_signature_sharing=True)
+    assert updated is not None
+    assert updated.opt_out_signature_sharing is True
+    # And the subsequent get reflects the same value.
+    fetched = await store.get(record.id)
+    assert fetched is not None
+    assert fetched.opt_out_signature_sharing is True
+    # The slug index also sees the mutation.
+    by_slug = await store.get_by_slug("acme")
+    assert by_slug is not None
+    assert by_slug.opt_out_signature_sharing is True
+
+
+@pytest.mark.asyncio
+async def test_set_opt_out_round_trip_false() -> None:
+    store = InMemoryTenantStore()
+    record = await store.create(slug="acme", display_name="Acme Inc")
+    await store.set_opt_out(record.id, opt_out_signature_sharing=True)
+    back = await store.set_opt_out(record.id, opt_out_signature_sharing=False)
+    assert back is not None
+    assert back.opt_out_signature_sharing is False
+
+
+@pytest.mark.asyncio
+async def test_set_opt_out_on_missing_id_returns_none() -> None:
+    store = InMemoryTenantStore()
+    result = await store.set_opt_out("does-not-exist", opt_out_signature_sharing=True)
+    assert result is None
+
+
+def test_strip_password_preserves_opt_out_value() -> None:
+    # Build a record with both a password and the opt-out flag set; the
+    # stripped copy must lose the password but keep the flag.
+    from datetime import datetime, timezone
+
+    raw = TenantRecord(
+        id="t-1",
+        slug="acme",
+        display_name="Acme",
+        plan="free",
+        db_schema_name="vw_acme",
+        db_role_name="vw_acme_app",
+        created_at=datetime.now(timezone.utc),
+        role_password="hunter2",
+        opt_out_signature_sharing=True,
+    )
+    stripped = _strip_password(raw)
+    assert stripped.role_password is None
+    assert stripped.opt_out_signature_sharing is True
+
+    # And when role_password is already None the function is a no-op
+    # but still carries the opt-out flag through.
+    raw2 = TenantRecord(
+        id="t-2",
+        slug="globex",
+        display_name="Globex",
+        plan="free",
+        db_schema_name="vw_globex",
+        db_role_name="vw_globex_app",
+        created_at=datetime.now(timezone.utc),
+        role_password=None,
+        opt_out_signature_sharing=True,
+    )
+    stripped2 = _strip_password(raw2)
+    assert stripped2.opt_out_signature_sharing is True
 
 
 # ---------------------------------------------------------------------------

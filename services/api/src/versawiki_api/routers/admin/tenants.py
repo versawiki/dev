@@ -16,6 +16,9 @@ Contract notes:
 - The per-tenant Postgres role password is returned exactly once
   inside the create response, alongside the ``TenantOut`` body, so
   the caller can persist it in their own secret store.
+- M1-MCP-05 adds ``PATCH /{tenant_id}/opt-out`` so an admin can flip
+  ``opt_out_signature_sharing`` on a tenant. The meta-MCP collector
+  honors this flag via its own ``TenantSignatureConfig.opt_out``.
 """
 
 from __future__ import annotations
@@ -28,7 +31,11 @@ from ...db.tenant_store import TenantAlreadyExistsError, TenantRecord
 from ...db.provisioner import InvalidSlugError
 from ...errors import TenantAlreadyExists, TenantNotFound, VersawikiHTTPException
 from ...schemas.common import PaginatedList, PaginationParamsDep
-from ...schemas.tenant import CreateTenantRequest, TenantOut
+from ...schemas.tenant import (
+    CreateTenantRequest,
+    TenantOut,
+    UpdateTenantOptOutRequest,
+)
 
 router = APIRouter(prefix="/tenants")
 
@@ -41,6 +48,7 @@ def _to_out(record: TenantRecord) -> TenantOut:
         plan=record.plan,  # type: ignore[arg-type]
         db_schema_name=record.db_schema_name,
         created_at=record.created_at,
+        opt_out_signature_sharing=record.opt_out_signature_sharing,
     )
 
 
@@ -154,6 +162,27 @@ async def get_tenant(
     store: TenantStoreDep,
 ) -> TenantOut:
     record = await store.get(tenant_id)
+    if record is None:
+        raise TenantNotFound(details={"tenant_id": tenant_id})
+    return _to_out(record)
+
+
+@router.patch(
+    "/{tenant_id}/opt-out",
+    response_model=TenantOut,
+    summary="Update a tenant's signature-sharing opt-out flag.",
+    responses={404: {"description": "Tenant not found."}},
+)
+async def update_tenant_opt_out(
+    tenant_id: str,
+    payload: UpdateTenantOptOutRequest,
+    _admin: AdminApiKey,
+    store: TenantStoreDep,
+) -> TenantOut:
+    record = await store.set_opt_out(
+        tenant_id,
+        opt_out_signature_sharing=payload.opt_out_signature_sharing,
+    )
     if record is None:
         raise TenantNotFound(details={"tenant_id": tenant_id})
     return _to_out(record)

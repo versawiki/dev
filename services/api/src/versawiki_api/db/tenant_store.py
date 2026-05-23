@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol, runtime_checkable
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .models.admin import Tenant as TenantRow
@@ -52,6 +52,7 @@ class TenantRecord:
     db_role_name: str
     created_at: datetime
     role_password: str | None = None
+    opt_out_signature_sharing: bool = False
 
 
 class TenantAlreadyExistsError(ValueError):
@@ -85,6 +86,15 @@ class TenantStore(Protocol):
         offset: int = 0,
     ) -> tuple[list[TenantRecord], int]:
         """List tenants. Returns (items, total)."""
+        ...
+
+    async def set_opt_out(
+        self,
+        tenant_id: str,
+        *,
+        opt_out_signature_sharing: bool,
+    ) -> TenantRecord | None:
+        """Toggle the opt-out flag. Returns the updated record or None if tenant missing."""
         ...
 
 
@@ -144,6 +154,7 @@ class InMemoryTenantStore:
                 db_role_name=role,
                 created_at=datetime.now(timezone.utc),
                 role_password=role_password,
+                opt_out_signature_sharing=False,
             )
             row = _InMemoryRow(record=record)
             self._by_id[record.id] = row
@@ -168,6 +179,34 @@ class InMemoryTenantStore:
         records.sort(key=lambda r: r.created_at)
         total = len(records)
         return records[offset : offset + limit], total
+
+    async def set_opt_out(
+        self,
+        tenant_id: str,
+        *,
+        opt_out_signature_sharing: bool,
+    ) -> TenantRecord | None:
+        async with self._lock:
+            row = self._by_id.get(tenant_id)
+            if row is None:
+                return None
+            current = row.record
+            # TenantRecord is frozen=True, so rebuild and reassign.
+            updated = TenantRecord(
+                id=current.id,
+                slug=current.slug,
+                display_name=current.display_name,
+                plan=current.plan,
+                db_schema_name=current.db_schema_name,
+                db_role_name=current.db_role_name,
+                created_at=current.created_at,
+                role_password=current.role_password,
+                opt_out_signature_sharing=opt_out_signature_sharing,
+            )
+            row.record = updated
+            # The slug index points to the same _InMemoryRow object, so
+            # it sees the mutation through ``row.record`` automatically.
+            return _strip_password(updated)
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +235,7 @@ class PostgresTenantStore:
             db_role_name=row.db_role_name,
             created_at=row.created_at,
             role_password=None,
+            opt_out_signature_sharing=row.opt_out_signature_sharing,
         )
 
     async def create(
@@ -235,6 +275,7 @@ class PostgresTenantStore:
             db_role_name=record.db_role_name,
             created_at=record.created_at,
             role_password=result.role_password,
+            opt_out_signature_sharing=record.opt_out_signature_sharing,
         )
 
     async def get(self, tenant_id: str) -> TenantRecord | None:
@@ -267,6 +308,30 @@ class PostgresTenantStore:
             rows = (await session.execute(stmt)).scalars().all()
             return [self._row_to_record(r) for r in rows], int(total)
 
+    async def set_opt_out(
+        self,
+        tenant_id: str,
+        *,
+        opt_out_signature_sharing: bool,
+    ) -> TenantRecord | None:
+        async with self._sessionmaker() as session, session.begin():
+            stmt = (
+                update(TenantRow)
+                .where(TenantRow.id == tenant_id)
+                .values(opt_out_signature_sharing=opt_out_signature_sharing)
+            )
+            result = await session.execute(stmt)
+            if result.rowcount == 0:
+                return None
+            row = (
+                await session.execute(
+                    select(TenantRow).where(TenantRow.id == tenant_id),
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            return self._row_to_record(row)
+
 
 def _strip_password(record: TenantRecord) -> TenantRecord:
     """Return a copy of ``record`` with ``role_password`` cleared."""
@@ -281,6 +346,7 @@ def _strip_password(record: TenantRecord) -> TenantRecord:
         db_role_name=record.db_role_name,
         created_at=record.created_at,
         role_password=None,
+        opt_out_signature_sharing=record.opt_out_signature_sharing,
     )
 
 

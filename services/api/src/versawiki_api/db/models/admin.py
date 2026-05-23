@@ -19,8 +19,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import (
     JSON,
+    Boolean,
     DateTime,
     ForeignKey,
     MetaData,
@@ -67,6 +69,17 @@ class Tenant(AdminBase):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+    )
+    # M1-MCP-05: per-tenant opt-out for signature sharing. When True,
+    # the meta-MCP collector drops every envelope from this tenant
+    # before anything reaches the meta store. The API-surface name is
+    # the more explicit ``opt_out_signature_sharing``; the meta-mcp's
+    # ``TenantSignatureConfig`` exposes the same value under ``opt_out``.
+    opt_out_signature_sharing: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sa.false(),
+        default=False,
     )
 
     api_keys: Mapped[list["ApiKeyRow"]] = relationship(

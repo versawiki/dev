@@ -67,3 +67,24 @@ class TenantOut(BaseModel):
         description="Postgres schema name (vw_<slug>). Informational; not client-settable.",
     )
     created_at: datetime
+    opt_out_signature_sharing: bool = Field(
+        False,
+        description=(
+            "When True, the tenant's signature envelopes are dropped at the "
+            "collector and never reach the meta-MCP store."
+        ),
+    )
+
+
+class UpdateTenantOptOutRequest(BaseModel):
+    """PATCH /v1/admin/tenants/{tenant_id}/opt-out body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    opt_out_signature_sharing: bool = Field(
+        ...,
+        description=(
+            "Set True to opt this tenant out of signature sharing, False to "
+            "re-enroll. The meta-MCP collector consults this on every event."
+        ),
+    )

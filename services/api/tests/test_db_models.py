@@ -42,6 +42,7 @@ def test_tenant_table_shape() -> None:
         "db_schema_name",
         "db_role_name",
         "created_at",
+        "opt_out_signature_sharing",
     } <= cols
     # Primary key
     pk = {c.name for c in Tenant.__table__.primary_key.columns}
@@ -49,6 +50,18 @@ def test_tenant_table_shape() -> None:
     # slug unique
     unique_constraint_names = {uc.name for uc in Tenant.__table__.constraints if uc.name}
     assert "uq_tenants_slug" in unique_constraint_names
+
+
+def test_tenant_opt_out_column_non_nullable_and_defaults_false() -> None:
+    col = Tenant.__table__.columns["opt_out_signature_sharing"]
+    assert col.nullable is False
+    # server_default is rendered as a SQL clause; coerce to text and
+    # check it carries the "false" literal alembic emitted.
+    assert col.server_default is not None
+    assert "false" in str(col.server_default.arg).lower()
+    # The Python-side default keeps in-memory call sites happy.
+    assert col.default is not None
+    assert col.default.arg is False
 
 
 def test_api_key_row_table_shape() -> None:
