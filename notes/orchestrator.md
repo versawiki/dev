@@ -2,6 +2,31 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (operations docs + customer support agent — actual end of session)
+
+**Customer support agent shipped:** `services/support-agent/`, 62 tests. The privacy posture from versawiki proper carries through — cross-tenant block, PII redaction in logs, forbidden actions that always refuse + escalate.
+
+**Six operations docs written in `docs/operations/`:**
+
+1. `agent-sdk-spec.md` — Full architecture for moving from Cowork cron to a 24/7 Claude Agent SDK service on the GCP VM (the same one hosting the project-docs-* MCPs). ~3 working days to deploy.
+2. `dns-cloudflare-migration.md` — Step-by-step for moving 4 domains from Namecheap. ~30 min hands-on for Josh.
+3. `launch-readiness.md` — Tiered checklist: long-lead (Apple, LLC) NOW; infra (Fly, Neon) when M1 code-complete; legal (privacy policy, ToS, DPA) before first paying customer.
+4. `llc-and-business.md` — Stripe Atlas recommended ($500, ~1 week). Personal liability shield required before accepting customer money. 30-day post-formation checklist.
+5. `app-store-prep.md` — Apple Developer + Google Play accounts to start NOW (long approval lead). Code signing cert decisions; deferrals.
+6. `customer-support-strategy.md` — How "no humans" actually works in practice. Cost model: ~$60/month at 100 customers vs. $4200/month for a human support person.
+
+**New backlog tracks:** `M1-CS-*` (6 follow-on Customer Support tickets) and `OPS-*` (7 operational items, mostly Josh-driven).
+
+**Total test count: 523** (api 115 + ingestion 180 + meta-mcp 166 + support-agent 62).
+
+**Final commit of the session about to land.** Overnight cron continues. Josh going to bed.
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-23 (Wave 6 integration + sleep handoff)
 
 **Spawned in parallel:** Backend (M1-BE-05 MCP-over-HTTP), Ingestion (M1-ING-04 ontology inducer), MCP-builder (M1-MCP-04 skill applier).
