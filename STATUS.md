@@ -4,6 +4,7 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Last session summary
 
+- **2026-05-23 interactive** — OPS-04 v0 lands in `services/orchestrator/`: Claude Agent SDK wrapper, FastAPI control API, SQLite audit log with hash chain, spending caps (Sonnet default, $20/day), branch-only PR writer, SMTP escalation, Dockerfile + compose snippet, full VM deploy guide. 39 orchestrator tests passing. Mode defaults to **observe** — agent runs but PRs aren't opened for the first 48h soak. Next: Josh runs the deploy walkthrough on the VM.
 - **2026-05-23 overnight cron** — *no new commit by cron* — Picked M1-ING-03c off the top of the safe list; specialist completed it cleanly (225→230 in ingestion, +5 tests, all green). At push time discovered `origin/main` had advanced to `087a59c` with a functionally identical M1-ING-03c commit landed independently. Cron abandoned its `54ddb1b`, reset to `origin/main`, and pushed this BACKLOG/STATUS/notes bookkeeping fix instead. See `notes/orchestrator.md` top entry.
 - **2026-05-23 overnight cron** — `227f5a2` — M1-ING-03b: Classifier retry on LLM 429/5xx (Anthropic + OpenAI providers, shared `_post_with_retries` helper, exponential backoff matching the embedder pattern). +10 tests in ingestion (215 → 225). All 582 tests green.
 - **2026-05-23 follow-up** — `087a59c` — M1-ING-03c: catch-all annotation in classifier prompt (Anthropic + OpenAI providers, +5 tests in ingestion, 225 → 230). Landed independently of the overnight cron; cron detected the duplicate and stopped cleanly.
@@ -53,7 +54,7 @@ Still live. Safe list shrunk by one more (M1-ING-03c now Done via `087a59c`). Ne
 1. **M1-QA-01 end-to-end smoke against a real corpus** — now possible with both keys + ING-05. Point it at the prior MCP repo's docs as a corpus and verify the whole pipeline produces pages.
 2. **M1-CS-03/04 wire support agent to admin API + SMTP** — gets customer support actually functional.
 3. **M1-MCP-05 opt-out API surface** — last meta-MCP ticket.
-4. **OPS-04 Agent SDK orchestrator** when you're ready for the deployment work.
+4. **OPS-04 deploy** — paste the walkthrough at `docs/operations/orchestrator-deploy.md` into the VM CLI. ~30 min wall-clock.
 
 ## Quick links
 

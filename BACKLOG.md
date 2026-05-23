@@ -42,7 +42,7 @@ Prioritized top-to-bottom within each section.
 
 ## In flight
 
-- (none)
+- `OPS-04 — Claude Agent SDK orchestrator on the GCP VM` — Code shipped under `services/orchestrator/`. 39 tests passing. Dockerfile + compose snippet + step-by-step VM deploy guide at `docs/operations/orchestrator-deploy.md`. **Josh next**: paste-and-build on the VM (observe mode for 48h, then flip to act).
 
 ## Done
 

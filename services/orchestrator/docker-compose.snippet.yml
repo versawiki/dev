@@ -1,0 +1,60 @@
+# Snippet to paste into the existing docker-compose.yml on the VM
+# (the one running project-docs-bc / project-docs-ae / project-docs-ams /
+# renewable-knowledge + Postgres).
+#
+# After pasting, run:
+#   docker compose up -d --build versawiki-orchestrator
+#
+# The first build downloads ~400 MB (Python base + claude-agent-sdk's
+# bundled Claude Code CLI). Subsequent builds are layer-cached.
+
+services:
+  versawiki-orchestrator:
+    build:
+      context: ./versawiki-orchestrator
+      dockerfile: Dockerfile
+    image: versawiki-orchestrator:0.1.0
+    container_name: versawiki-orchestrator
+    restart: unless-stopped
+
+    # Env file lives outside the repo, alongside the existing MCP secrets.
+    env_file:
+      - /etc/versawiki/orchestrator.env
+
+    # The mode flag is the most important toggle — start in observe.
+    environment:
+      - VW_ORCH_MODE=observe
+      - VW_ORCH_CONTROL_API_HOST=0.0.0.0
+      - VW_ORCH_CONTROL_API_PORT=8088
+      - VW_ORCH_TICK_INTERVAL_SECONDS=300
+      - VW_ORCH_DAILY_SPEND_CAP_USD=20
+      - VW_ORCH_WEEKLY_SPEND_CAP_USD=100
+      - VW_ORCH_MONTHLY_SPEND_CAP_USD=350
+      - VW_ORCH_MODEL=claude-sonnet-4-6
+
+    volumes:
+      - versawiki_orchestrator_data:/var/lib/versawiki-orchestrator
+
+    # Bind 127.0.0.1 only — exposed through nginx (or Cloudflare tunnel)
+    # to orchestrator.versawiki.com when ready.
+    ports:
+      - "127.0.0.1:8088:8088"
+
+    # Share the network with the existing MCPs if you want the agent to
+    # reach project-docs-* later. Optional for v0.
+    # networks:
+    #   - mcp_net
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  versawiki_orchestrator_data:
+    driver: local
+
+# networks:
+#   mcp_net:
+#     external: true

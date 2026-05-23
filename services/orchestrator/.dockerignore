@@ -1,0 +1,14 @@
+# Don't ship test artifacts or local dev state into the image.
+.git/
+.gitignore
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+**/.mypy_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+tests/
+.vw-*
+audit.sqlite*
