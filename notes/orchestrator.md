@@ -2,6 +2,36 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-22 (Wave 4 integration)
+
+**Spawned in parallel:** Backend (M1-BE-03 tenant provisioner), Ingestion (M1-ING-02 chunker+embedder — fully net-new), MCP-builder (M1-MCP-02 signature collector).
+
+**All three returned strong, mutually-non-overlapping work. Test counts:**
+
+- api: 27 -> 77 (+50 BE-03 unit tests; 2 integration skips for no-DB sandbox)
+- ingestion: 40 -> 90 (+50 ING-02 chunker/embedding/pipeline tests)
+- meta-mcp: 41 -> 106 (+65 MCP-02 signatures/collector/store tests)
+
+**Total now: 273 tests passing across the three services.**
+
+**Privacy story is now fully operational, not just documented.** The MCP-02 collector is the single chokepoint between raw ingestion events and the meta-store; it routes everything through the MCP-01a CheckerPipeline before persistence. The load-bearing privacy test is `test_collector_blocked_by_checker.py::test_phone_shaped_anon_id_is_rejected_by_pii_stage` — if that ever flips to passing wrong, the collector has dropped its gate and the privacy invariant is broken.
+
+**Two source bugs in MCP-01a fixed inline by the MCP-02 agent while building on top:**
+1. PII regex matched ~3% of random UUIDv4s as phone numbers — now whitelists UUID-shape strings.
+2. `FileMetaStore` `_parse_iso_z` tolerates Pydantic's `Z` suffix on Python 3.10 (sandbox) where `datetime.fromisoformat` is strict.
+
+**Carried-over xfail** (from MCP-01a): `branching_factor_p50/p95` capped at [0,1] though spec allows real values >1. Tracked in icebox as `M1-MCP-01a-fix`. Non-privacy bug; doesn't block Wave 5.
+
+**Backend agent suggested 3 follow-ups, added to icebox:** BE-03b (CI Postgres integration), BE-03c (per-request SET ROLE + search_path dep), provisioner idempotency/"ensure" mode.
+
+**Next: Wave 5 — BE-04 (query API routes wired to per-tenant DB) + ING-03 (LLM document classifier) + MCP-03 (skill writer).** All three independent.
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-22 (Wave 3 integration — second pass)
 
 **First-pass Wave 3 was killed mid-flight by a session limit before agents reported back, but the agents had committed real code to disk before dying.** On resume (Josh upgraded to Max), audited the disk state:

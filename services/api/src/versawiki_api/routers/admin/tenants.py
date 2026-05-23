@@ -1,41 +1,85 @@
-"""Tenant admin routes (stub bodies).
+"""Tenant admin routes — real persistence via :class:`TenantStore`.
 
-Persistence is BE-03's job. Today these return shape-correct stub
-responses so the OpenAPI contract is stable and client codegen
-already works.
+BE-03 swap: the stubs that returned synthetic ``TenantOut`` objects
+are gone. ``create_tenant``, ``list_tenants`` and ``get_tenant`` now
+all flow through a :class:`TenantStore` (the app's wired implementation
+is in-memory by default; production wiring drops in
+:class:`PostgresTenantStore` with a :class:`TenantProvisioner` behind
+it).
 
-Contract notes for downstream tickets:
-- A tenant's ``slug`` is the URL-safe identifier used everywhere
-  (schema name = ``vw_<slug>``, MCP URL = ``/t/<slug>/mcp`` if we
-  ever go path-based).
-- ``id`` is a server-issued opaque string (UUIDv7 in BE-03).
+Contract notes:
+
+- A tenant's ``slug`` is the URL-safe identifier used everywhere.
+- ``id`` is a server-issued opaque string (UUIDv4 today).
 - ``db_schema_name`` is informational on the wire and is *not*
   client-controllable.
+- The per-tenant Postgres role password is returned exactly once
+  inside the create response, alongside the ``TenantOut`` body, so
+  the caller can persist it in their own secret store.
 """
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, status
+from pydantic import BaseModel, ConfigDict, Field
 
-from ...deps import AdminApiKey
-from ...errors import TenantNotFound
+from ...deps import AdminApiKey, TenantStoreDep
+from ...db.tenant_store import TenantAlreadyExistsError, TenantRecord
+from ...db.provisioner import InvalidSlugError
+from ...errors import TenantAlreadyExists, TenantNotFound, VersawikiHTTPException
 from ...schemas.common import PaginatedList, PaginationParamsDep
 from ...schemas.tenant import CreateTenantRequest, TenantOut
 
 router = APIRouter(prefix="/tenants")
 
 
-def _stub_tenant(slug: str, display_name: str | None = None) -> TenantOut:
+def _to_out(record: TenantRecord) -> TenantOut:
     return TenantOut(
-        id=str(uuid.uuid4()),
-        slug=slug,
-        display_name=display_name or slug.replace("-", " ").title(),
-        plan="free",
-        db_schema_name=f"vw_{slug}",
-        created_at=datetime.now(timezone.utc),
+        id=record.id,
+        slug=record.slug,
+        display_name=record.display_name,
+        plan=record.plan,  # type: ignore[arg-type]
+        db_schema_name=record.db_schema_name,
+        created_at=record.created_at,
+    )
+
+
+class CreatedTenant(BaseModel):
+    """Body of the 201 response from ``POST /v1/admin/tenants``.
+
+    ``role_password`` is shown exactly once. The caller MUST persist it
+    in their own secret store if they ever need the per-tenant role's
+    credentials (subsequent admin calls will not return it).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    slug: str
+    display_name: str
+    plan: str
+    db_schema_name: str
+    db_role_name: str
+    role_password: str | None = Field(
+        default=None,
+        description=(
+            "The per-tenant Postgres role password. Returned exactly once "
+            "at create time when the provisioner is wired; null otherwise."
+        ),
+    )
+    created_at: str  # ISO-8601
+
+
+def _record_to_created(record: TenantRecord) -> CreatedTenant:
+    return CreatedTenant(
+        id=record.id,
+        slug=record.slug,
+        display_name=record.display_name,
+        plan=record.plan,
+        db_schema_name=record.db_schema_name,
+        db_role_name=record.db_role_name,
+        role_password=record.role_password,
+        created_at=record.created_at.isoformat(),
     )
 
 
@@ -43,33 +87,56 @@ def _stub_tenant(slug: str, display_name: str | None = None) -> TenantOut:
     "",
     response_model=TenantOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a tenant (stub).",
+    summary="Create a tenant.",
     description=(
-        "Stub implementation. Returns a shape-correct TenantOut without "
-        "persisting anything. BE-03 wires the real persistence + schema "
-        "provisioner."
+        "Provisions a new tenant: inserts a row into the admin tenants "
+        "table and, when the provisioner is wired, creates the "
+        "``vw_<slug>`` schema and ``vw_<slug>_app`` role."
     ),
+    responses={
+        409: {"description": "A tenant with that slug already exists."},
+        422: {"description": "Slug failed validation."},
+    },
 )
-def create_tenant(
+async def create_tenant(
     payload: CreateTenantRequest,
     _admin: AdminApiKey,
+    store: TenantStoreDep,
 ) -> TenantOut:
-    return _stub_tenant(slug=payload.slug, display_name=payload.display_name)
+    try:
+        record = await store.create(
+            slug=payload.slug,
+            display_name=payload.display_name,
+            plan=payload.plan,
+        )
+    except TenantAlreadyExistsError:
+        raise TenantAlreadyExists(
+            details={"slug": payload.slug},
+        ) from None
+    except InvalidSlugError as exc:
+        raise VersawikiHTTPException(
+            status_code=422,
+            code="validation_error",
+            message=str(exc),
+            details={"slug": payload.slug},
+        ) from None
+    return _to_out(record)
 
 
 @router.get(
     "",
     response_model=PaginatedList[TenantOut],
-    summary="List tenants (stub).",
-    description="Stub implementation. Returns an empty page.",
+    summary="List tenants.",
 )
-def list_tenants(
+async def list_tenants(
     pagination: PaginationParamsDep,
     _admin: AdminApiKey,
+    store: TenantStoreDep,
 ) -> PaginatedList[TenantOut]:
+    records, total = await store.list(limit=pagination.limit, offset=pagination.offset)
     return PaginatedList[TenantOut](
-        items=[],
-        total=0,
+        items=[_to_out(r) for r in records],
+        total=total,
         limit=pagination.limit,
         offset=pagination.offset,
     )
@@ -78,18 +145,15 @@ def list_tenants(
 @router.get(
     "/{tenant_id}",
     response_model=TenantOut,
-    summary="Get a tenant by id (stub).",
-    description="Stub implementation. Always 404s; BE-03 wires lookup.",
+    summary="Get a tenant by id.",
     responses={404: {"description": "Tenant not found."}},
 )
-def get_tenant(
+async def get_tenant(
     tenant_id: str,
     _admin: AdminApiKey,
+    store: TenantStoreDep,
 ) -> TenantOut:
-    # Until BE-03 wires persistence we cannot resolve any id. We always
-    # respond with a structured 404 so clients can rely on the error
-    # envelope shape.
-    raise TenantNotFound(
-        message="Tenant lookup is not implemented yet.",
-        details={"tenant_id": tenant_id},
-    )
+    record = await store.get(tenant_id)
+    if record is None:
+        raise TenantNotFound(details={"tenant_id": tenant_id})
+    return _to_out(record)

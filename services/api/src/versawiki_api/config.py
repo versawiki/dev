@@ -3,7 +3,7 @@
 Prefix is ``VW_`` so a deployment env file looks like::
 
     VW_ENV=prod
-    VW_DB_URL=postgresql+psycopg://...
+    VW_DATABASE_URL=postgresql+asyncpg://...
     VW_REDIS_URL=rediss://...
     VW_CORS_ORIGINS=https://app.versawiki.io,https://desktop.versawiki.io
 
@@ -50,10 +50,23 @@ class Settings(BaseSettings):
         description="Allow-list for browser clients.",
     )
 
-    # ---- data layer (consumed by BE-03) ----
+    # ---- data layer ----
+    # ``database_url`` is the canonical async-DSN consumed by BE-03's
+    # SQLAlchemy engine factory (driver: asyncpg). The legacy ``db_url``
+    # remains as a back-compat shim so callers that referenced it
+    # before BE-03 still build, but every new caller should reach for
+    # ``database_url``.
+    database_url: str = "postgresql+asyncpg://localhost/versawiki"
     db_url: str = "postgresql+psycopg://localhost/versawiki"
     db_pool_size: int = 10
     db_pool_max_overflow: int = 20
+    db_echo: bool = False
+
+    # Password used when the provisioner creates the per-tenant role's
+    # initial credentials. In production the provisioner generates a
+    # one-shot password per tenant; this default exists so unit tests
+    # render deterministic SQL.
+    tenant_role_password_bytes: int = 32
 
     # ---- queue / cache (consumed by BE-02 rate limiting + ingestion workers) ----
     redis_url: str = "redis://localhost:6379/0"

@@ -28,6 +28,9 @@ dependencies = [
     "python-magic>=0.4,<1",
     # Email parsing — extract-msg handles Outlook .msg; stdlib `email` handles .eml.
     "extract-msg>=0.50,<1",
+    # Embedding provider HTTP client (OpenAIEmbeddingProvider, future bge-m3 / nomic).
+    # Added by M1-ING-02; matches the FastAPI stack's httpx version.
+    "httpx>=0.27,<1",
 ]
 
 [project.optional-dependencies]

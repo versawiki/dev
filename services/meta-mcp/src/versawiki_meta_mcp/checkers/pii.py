@@ -49,18 +49,23 @@ _PHONE_RE = re_mod.compile(
     r"\d{3}[\s\-.]?\d{4}(?!\d)"                  # 7-digit local
 )
 
-# US SSN shape: 3-2-4 digits separated by `-` or space. Spec says
-# "SSN-shape numbers". We deliberately avoid raw 9-digit runs because
-# those collide with structural counts; a real SSN nearly always carries
-# the separator.
+# US SSN shape: 3-2-4 digits separated by `-` or space.
 _SSN_RE = re_mod.compile(r"(?<!\d)\d{3}[-\s]\d{2}[-\s]\d{4}(?!\d)")
 
-# URL — http(s) or bare host with TLD. Catches `example.com/path` and
-# `https://example.com`.
+# URL — http(s) or bare host with TLD.
 _URL_RE = re_mod.compile(
     r"(?:https?://|www\.)\S+|"
     r"\b[\p{L}0-9\-]+\.(?:com|org|net|io|co|gov|edu|us|uk|de|fr|jp|cn|au|info)"
     r"(?:/\S*)?\b",
+    re_mod.IGNORECASE,
+)
+
+# UUID shape: 8-4-4-4-12 hex with dashes. Schema-typed `event_id` and
+# `tenant_anon_id` values match this. Whitelisted so the over-eager
+# phone/SSN regexes don't false-positive on random UUIDs.
+# Tracked in notes/mcp-builder.md as the M1-MCP-02 hardening fix.
+_UUID_RE = re_mod.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re_mod.IGNORECASE,
 )
 
@@ -76,11 +81,8 @@ class _Hit:
 class PIIConfig:
     """Tunable knobs for the PII stage."""
 
-    # If True, attempt to load the spaCy model. If False, regex-only.
     use_spacy: bool = True
-    # Override which spaCy model to load.
     spacy_model: str = "en_core_web_sm"
-    # NER labels that constitute a hard reject.
     rejecting_ner_labels: frozenset[str] = field(
         default_factory=lambda: frozenset({"PERSON", "ORG", "GPE", "LOC", "NORP"})
     )
@@ -109,6 +111,12 @@ def _walk_strings(obj: Any, path: str = "$") -> Iterator[tuple[str, str]]:
 
 
 def _regex_scan(value: str) -> Optional[_Hit]:
+    # UUID whitelist: values that are exactly a UUID-shape string can't
+    # encode a name, phone, etc. — they're schema-typed identifiers. This
+    # closes the over-eager phone/SSN false-positive against random UUIDv4s
+    # (tracked in notes/mcp-builder.md as the M1-MCP-02 hardening fix).
+    if _UUID_RE.match(value):
+        return None
     if _EMAIL_RE.search(value):
         return _Hit(ReasonCode.NER_HIT_EMAIL, "email-shaped substring", "")
     if _SSN_RE.search(value):
@@ -142,7 +150,6 @@ class PIIChecker:
             try:
                 self._nlp = spacy.load(self.config.spacy_model)
             except OSError:
-                # Model not installed in the sandbox. Regex-only fallback.
                 self._nlp = None
         except ImportError:
             self._nlp = None
@@ -156,11 +163,9 @@ class PIIChecker:
         self._ensure_spacy()
 
         for value, json_path in _walk_strings(serialized):
-            # 1. Whitelist: strings drawn from controlled vocabularies pass.
             if value in ALLOWED_LITERAL_STRINGS:
                 continue
 
-            # 2. Regex layer first — cheap.
             hit = _regex_scan(value)
             if hit is not None:
                 return CheckResult(
@@ -170,8 +175,6 @@ class PIIChecker:
                     details=f"{hit.description} at {json_path}",
                 )
 
-            # 3. spaCy NER, if loaded. Run only on values long enough to
-            #    plausibly contain a name (cheap filter).
             if self._nlp is not None and len(value) >= 2:
                 doc = self._nlp(value)
                 for ent in doc.ents:
