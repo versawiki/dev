@@ -2,6 +2,30 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — STOPPED, 4th consecutive tick — safe list fully queued)
+
+**Situation at tick start:** STATUS.md clear (no in-flight work). BACKLOG.md overnight
+safe list: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`.
+
+**All four items have open, non-draft, mergeable PRs** — same finding as ticks 1–3
+(PRs #3, #10, #14/#15, #17). This is the fourth consecutive cron tick that can take no
+productive action. Stopping per rule 7 and opening draft PR.
+
+**Current merge queue** (confirmed by GitHub API this tick):
+
+| PR | Ticket | Branch | State | Action needed |
+|----|--------|--------|-------|---------------|
+| #13 | M1-MCP-05 | `vw-agent/M1-MCP-05-rebased` | open, mergeable | **MERGE** (supersedes #2, #9) |
+| #11 | PII UUID fix | `vw-agent/meta-mcp-pii-uuid-skip` | open | **MERGE** (CI hardening) |
+| #16 | M1-QA-01 | `vw-agent/M1-QA-01-rebased` | open, mergeable | **MERGE** (supersedes #4) |
+| #5  | M1-QA-02 | `vw-agent/M1-QA-02` | open, mergeable | **MERGE** |
+| #7  | M1-QA-03 | `vw-agent/M1-QA-03` | open, mergeable | **MERGE** (needs #16 first) |
+
+**Draft/noise PRs to close after merging:** #2, #3, #4, #8, #9, #10, #14, #15, #17.
+
+**For cron to resume productive work:** merge the above, update BACKLOG.md (move
+M1-MCP-05 + M1-QA-01/02/03 to Done), and (if desired) add M1-CS-02 to the safe list.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
