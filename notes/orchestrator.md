@@ -2,6 +2,20 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — tick 7 — safe list still fully queued, no new action)
+
+**Situation at tick start:** All 4 overnight-safe items (`M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) have open PRs awaiting Josh's review and merge. `origin/main` advanced by 1 commit since tick 6 (`2a9bb51` — meta-mcp PII UUID-skip fix, PR #11). No conflicts with any pending PR (UUID fix touches only `checkers/pii.py`; all pending PRs touch disjoint files). meta-mcp tests: 191 passed, 1 skipped (unchanged).
+
+**Action taken:** None — queue still fully covered. Pending action for Josh: merge PR #19 (M1-MCP-05, canonical), then update BACKLOG.md to move it to Done. After that, cron can pick M1-QA-01.
+
+**Open PRs:**
+- PR #19 → `vw-agent/M1-MCP-05-tick6` (M1-MCP-05 opt-out API; 1 commit behind main but no conflicts)
+- PR #16 → `vw-agent/M1-QA-01-rebased` (M1-QA-01 smoke harness)
+- PR #5 → `vw-agent/M1-QA-02` (M1-QA-02 tenant-isolation property tests)
+- PR #7 → `vw-agent/M1-QA-03` (M1-QA-03 privacy-boundary property tests)
+
+---
+
 ## 2026-05-23 (overnight cron — tick 6 — M1-MCP-05 rebased onto current main, PR #19 opened)
 
 **Situation at tick start:** STATUS.md shows safe list still has M1-MCP-05, M1-QA-01/02/03 queued. Prior ticks (1–5) found the same state. However, the existing M1-MCP-05 branches (`vw-agent/M1-MCP-05-rebased` at `5e5aedf`) were based on `61ac45c` (2 commits behind current `origin/main` at `a71bcc5`) because PRs #12 + merge landed in between. GitHub likely shows the branch as "mergeable" but with a diff that includes the jsonschema removal — a false conflict.
