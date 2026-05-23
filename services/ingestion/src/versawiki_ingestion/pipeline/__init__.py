@@ -1,7 +1,7 @@
-"""Top-level pipeline: connector -> parser -> chunker -> embedder -> records."""
+"""Top-level pipeline: connector -> parser -> classifier -> chunker -> embedder -> records."""
 
 from .models import ChunkRecord, EmbeddingRecord, IngestionJob
-from .process_document import process_document
+from .process_document import ProcessedDocument, process_document
 from .worker import InProcessQueue, enqueue_ingest, run_job
 
 __all__ = [
@@ -9,6 +9,7 @@ __all__ = [
     "EmbeddingRecord",
     "IngestionJob",
     "InProcessQueue",
+    "ProcessedDocument",
     "enqueue_ingest",
     "process_document",
     "run_job",

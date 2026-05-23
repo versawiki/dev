@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from .admin import admin_router
 from .health import router as health_router
+from .v1 import v1_router
 
 
 def register_routers(app: FastAPI) -> None:
@@ -20,9 +21,9 @@ def register_routers(app: FastAPI) -> None:
     """
     app.include_router(health_router)
     app.include_router(admin_router, prefix="/v1/admin", tags=["admin"])
+    # BE-04: per-tenant query API.
+    app.include_router(v1_router, prefix="/v1", tags=["query"])
 
     # Future ticket mount points (intentional comments — keep when filling in):
-    # from .tenants import router as tenants_router  # BE-04
-    # app.include_router(tenants_router, prefix="/v1/tenants", tags=["tenants"])
     # from ..mcp.router import router as mcp_router  # BE-05
     # app.include_router(mcp_router, prefix="/mcp", tags=["mcp"])

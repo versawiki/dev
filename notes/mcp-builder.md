@@ -237,3 +237,128 @@ Pydantic anyway); no privacy implication.
 * M1-MCP-05 (opt-out): the tenant config's `opt_out` field is the
   single source of truth in this collector. M1-MCP-05 owns how it
   becomes True (user-facing flag, propagation).
+
+## 2026-05-23 — M1-MCP-03 skill writer
+
+Picked up M1-MCP-03 on top of MCP-01a's checker pipeline and MCP-02's
+file meta-store. Built the threshold-triggered LLM job that turns
+repeated cross-tenant signatures into auditable markdown skills.
+
+### What I added
+
+* `src/versawiki_meta_mcp/skills/` package (9 modules):
+  - `base.py` — `SkillDraft`, `SkillRecord`, `SkillRejectionRecord` with
+    `SkillDomain` / `SkillKind` Literal vocabularies, title regex
+    `^[A-Z][a-zA-Z0-9 -]{3,80}$`, slugifier.
+  - `thresholds.py` — `SkillWriteThreshold` (default 3 tenants / 25 obs
+    / 0.65 confidence floor) + per-domain overrides.
+  - `aggregator.py` — `SignatureAggregator` walks `MetaStore.query()`,
+    groups by `(domain, kind)`, computes distinct-tenant counts,
+    observation counts, mean confidence, Literal-vocab shape examples.
+    `domain` is resolved via injected `DomainResolver` (defaults to
+    "AEC"); env doesn't carry a domain field by design.
+  - `prompts.py` — system + user prompts. User prompt is fed ONLY the
+    `SignatureGroup` (bucket strings + counts-of-distinct, no raw
+    text).
+  - `llm_writer.py` — `LLMSkillWriter` Protocol with
+    `StubLLMSkillWriter` (deterministic), `AnthropicSkillWriter`,
+    `OpenAISkillWriter`. SDKs lazy-imported.
+  - `skill_text_check.py` — the privacy gate. Wraps the SAME stage
+    primitives the envelope `CheckerPipeline` uses (PII regex from
+    `checkers.pii`, §4 forbidden-name list from
+    `checkers.forbidden_fields`, raw-numeric detector, long-token
+    detector) and applies them to markdown text. Returns a
+    `ChainResult` so audit-log writers can be shared.
+  - `pipeline.py` — `SkillWritingPipeline` runs
+    aggregator -> threshold filter -> LLM -> CheckerPipeline-on-body ->
+    on PASS write file + emit `SkillRecord`. On FAIL, write
+    `SkillRejectionRecord` to `<skills_root>/_rejections.jsonl`. The
+    file-write call sits AFTER the chain.passed branch — there is no
+    other path that writes a skill file.
+  - `git_commit.py` — `SkillGitCommitter` with injected
+    `SubprocessRunner` Protocol. `git add` + `git commit`, never push.
+    Commit message lists source observation ids.
+
+### Tests
+
+```
+141 passed, 1 skipped, 1 xfailed in 1.28s (stable across 3 runs)
+```
+
+Prior 106 tests still pass. 35 new tests across 5 files:
+- `test_skill_writer_blocked_by_checker.py` (7) — **LOAD-BEARING**.
+  Parametrized over 6 poison bodies (forbidden field name, embedded
+  email, raw count, SSN, URL, long pasted-content token). For each:
+  no file written under skills root, exactly one rejection-line in the
+  audit log, audit keys = `{payload_hash, reason_code, stage, domain,
+  kind, rejected_at_utc}`, hash equals sha256 of the offending body,
+  and the offending bytes do NOT appear in the audit file. Plus a
+  "no path writes file ahead of check" test using an empty-body LLM.
+- `test_aggregator.py` (8) — grouping, distinct tenants counted,
+  threshold boundaries (tenant, observation, confidence), per-domain
+  override, shape examples content-free, empty store.
+- `test_skill_writer_stub.py` (6) — stub deterministic; pipeline writes
+  at canonical path; body_sha256 matches on-disk bytes; audit not
+  touched on success; below-threshold no-op; record observation ids
+  match group.
+- `test_skill_thresholds.py` (5) — default values locked; below-min-
+  tenants no-op; below-min-obs no-op; above-all writes; confidence
+  floor blocks low-confidence groups.
+- `test_skill_versioning.py` (3) — second write -> v2; third -> v3;
+  v1 file preserved (mtime + content unchanged) after later writes.
+- `test_skill_git_commit_mocked.py` (6) — fake `SubprocessRunner`
+  records argv; add-then-commit ordering; never pushes; commit message
+  deterministic + lists obs ids; split-git-dir flags wired; cwd is
+  repo_root; empty-records returns None.
+
+### Privacy invariant — load-bearing test that proves it
+
+`test_skill_writer_blocked_by_checker.py::
+ test_checker_rejects_skill_text_and_no_file_is_written` is the gate.
+6 poison-body variants, each asserts:
+
+1. `result.outcome == SkillWritingOutcome.CHECKER_REJECTED`
+2. No file under `skills_root/AEC/`
+3. `_rejections.jsonl` has exactly one line
+4. The line has only `{payload_hash, reason_code, stage, domain, kind,
+   rejected_at_utc}`
+5. `payload_hash == sha256(poisoned_body)`
+6. The poison bytes do NOT appear anywhere in the audit file (raw
+   bytes check, not just structured access)
+7. `result.chain_result.passed is False` with stage + reason set
+
+### Source bugs / quirks found in MCP-01a + MCP-02
+
+* `SkillDraft` initially had `str_strip_whitespace=True` on its
+  `model_config`, which silently mutated `body_markdown` before the
+  checker hashed it (de-synced the audit hash from the actual bytes).
+  Removed. Comment in `base.py` calls out why.
+* The `CheckerPipeline` is shaped around `DomainObservationEnvelope`
+  (validates schema, walks dict). It is NOT directly callable on
+  markdown text. I built `skill_text_check.check_skill_text()` to
+  re-use the same stage primitives (PII regex, forbidden-name list,
+  numeric detector) on raw markdown bodies. The two paths share the
+  `ChainResult` / `ReasonCode` / `Stage` enums so audit writers are
+  uniform.
+* `checkers.pii._PHONE_RE` and `_EMAIL_RE` and `_SSN_RE` and `_URL_RE`
+  are module-level; importing them from outside the package works
+  fine. We re-use them for the skill-text path rather than re-deriving.
+* `checkers.forbidden_fields.FORBIDDEN_FIELD_NAMES` is also imported.
+  The skill-text checker tokenizes the markdown body and asks "is any
+  bare token in the forbidden list" — this catches a body that talks
+  about "email" or "file_path" as words.
+
+### Hand-off
+
+* M1-MCP-04 (skill applier) reads from `<skills_root>/<domain>/*.md`.
+  The on-disk layout is `<domain>/<kind>__<title-slug>__v<n>.md`. The
+  `SkillRecord.relative_path` is the canonical form (POSIX separators).
+* The `SkillGitCommitter` deliberately does not push. Wire pushing in
+  the orchestrator alongside the rest of the team git pipeline.
+* `AnthropicSkillWriter` / `OpenAISkillWriter` SDK imports are lazy so
+  the package wheel builds without the LLM extras. Decision: don't
+  ship a hardcoded preference between providers in v1 — the orchestrator
+  picks at startup (mirrors the EmbeddingProvider interface choice
+  documented in DECISIONS).
+* No remaining xfails introduced. `branching_factor_p*` xfail from
+  MCP-01a is unchanged.

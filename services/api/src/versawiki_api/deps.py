@@ -85,6 +85,84 @@ def get_current_tenant(current_api_key: CurrentApiKey) -> StubTenantContext:
 CurrentTenant = Annotated[StubTenantContext, Depends(get_current_tenant)]
 
 
+
+
+# ---------------------------------------------------------------------------
+# Embedding provider (BE-04)
+# ---------------------------------------------------------------------------
+
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class EmbeddingProvider(Protocol):
+    """Duck-typed interface that matches `versawiki_ingestion.embedding.EmbeddingProvider`.
+
+    The api package does not depend on ``versawiki_ingestion`` at
+    runtime (they're sibling services), so we re-declare the minimum
+    surface here. Any provider with ``embed(list[str]) -> list[list[float]]``
+    plus ``dimension`` + ``provider_name`` attributes satisfies it,
+    which includes the ingestion service's ``StubEmbeddingProvider``
+    and ``OpenAIEmbeddingProvider``.
+    """
+
+    dimension: int
+    provider_name: str
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        ...
+
+
+class _LocalStubEmbeddingProvider:
+    """Process-local fallback when no provider is wired.
+
+    Deterministic but stripped down — the production tests reach for
+    the ingestion service's ``StubEmbeddingProvider`` (canonical) when
+    the test harness has added ingestion to ``sys.path``. This local
+    stub exists so the api process boots cleanly in dev when ingestion
+    isn't on the path.
+    """
+
+    provider_name = "local-stub"
+
+    def __init__(self, dimension: int = 1024) -> None:
+        self.dimension = dimension
+        self.calls: list[list[str]] = []
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        self.calls.append(list(texts))
+        return [[0.0] * self.dimension for _ in texts]
+
+
+_DEFAULT_EMBEDDING_PROVIDER: EmbeddingProvider | None = None
+
+
+def set_embedding_provider(app, provider: EmbeddingProvider) -> None:
+    """Install an embedding provider onto a FastAPI app's state."""
+    app.state.embedding_provider = provider
+
+
+def get_embedding_provider(request: Request) -> EmbeddingProvider:
+    """Return the request's wired embedding provider, defaulting to a stub.
+
+    Production wiring sets the OpenAI provider on ``app.state`` at
+    startup; tests can either inject the canonical ingestion stub via
+    :func:`set_embedding_provider` or rely on the lazy
+    ``_LocalStubEmbeddingProvider`` fallback.
+    """
+    provider = getattr(request.app.state, "embedding_provider", None)
+    if provider is not None:
+        return provider
+    global _DEFAULT_EMBEDDING_PROVIDER
+    if _DEFAULT_EMBEDDING_PROVIDER is None:
+        _DEFAULT_EMBEDDING_PROVIDER = _LocalStubEmbeddingProvider()
+    request.app.state.embedding_provider = _DEFAULT_EMBEDDING_PROVIDER
+    return _DEFAULT_EMBEDDING_PROVIDER
+
+
+EmbeddingProviderDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
+
+
 __all__ = [
     "ApiKey",
     "StubApiKey",
@@ -104,4 +182,8 @@ __all__ = [
     "get_tenant_store",
     "set_api_key_store",
     "settings_dep",
+    "EmbeddingProvider",
+    "EmbeddingProviderDep",
+    "get_embedding_provider",
+    "set_embedding_provider",
 ]

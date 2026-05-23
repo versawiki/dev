@@ -86,6 +86,23 @@ class ApiKeyNotFound(VersawikiHTTPException):
     default_message = "API key not found."
 
 
+class TenantScopeMismatch(VersawikiHTTPException):
+    """The API key's tenant does not match the path tenant_id.
+
+    Cross-tenant access is forbidden: a key issued for tenant A cannot
+    query tenant B even when the path parameter says so. We return 403
+    (the request was authenticated; the *scope* is wrong) with a stable
+    machine-readable code so clients can branch on it.
+    """
+
+    default_status_code = 403
+    default_code = "tenant_scope_mismatch"
+    default_message = (
+        "The API key is not authorized for this tenant. "
+        "Cross-tenant access is forbidden."
+    )
+
+
 class NotImplementedYet(VersawikiHTTPException):
     """Used by stub routes that future tickets will fill in."""
 

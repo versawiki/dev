@@ -2,6 +2,56 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (Wave 5 integration)
+
+**Spawned in parallel:** Backend (M1-BE-04 query routes), Ingestion (M1-ING-03 LLM classifier), MCP-builder (M1-MCP-03 skill writer).
+
+**All three returned strong, non-overlapping work. Test deltas:**
+
+- api: 77 -> 94 (+17 BE-04: query/pages/ontology routes + tenant scope + embed dep)
+- ingestion: 90 -> 133 (+43 ING-03: classifier, alternatives, uncertainty signals)
+- meta-mcp: 106 -> 141 (+35 MCP-03: aggregator, thresholds, LLM writer, text-checker, versioning, git commit)
+
+**Total now: 368 tests passing across three services.**
+
+**Architectural milestone:** the learning loop is operationally closed end-to-end:
+
+```
+parse -> chunk -> embed -> classify ->
+  (ClassifierUncertainty + DocumentTypeDistribution + ... signatures) ->
+SignatureCollector (gates via MCP-01a CheckerPipeline) ->
+  FileMetaStore ->
+SignatureAggregator (groups by domain/kind, thresholds) ->
+SkillWriter (LLM draft) ->
+  Text-shaped CheckerPipeline (built on MCP-01a primitives) ->
+services/meta-mcp/skills/<domain>/<kind>__<slug>__v<n>.md ->
+  git commit
+```
+
+Every byte that crosses the tenant boundary, in either direction (signature emit, skill apply), goes through a checker.
+
+**Three load-bearing privacy tests now green:**
+
+1. `test_audit_log.py::test_write_never_includes_payload_bytes` (MCP-01a — audit log never persists offending payload).
+2. `test_collector_blocked_by_checker.py::test_phone_shaped_anon_id_is_rejected_by_pii_stage` (MCP-02 — collector gate is the single chokepoint).
+3. `test_skill_writer_blocked_by_checker.py::test_checker_rejects_skill_text_and_no_file_is_written` parametrized over 6 poison bodies (MCP-03 — skill text gate before disk).
+
+If any of these silently pass wrong, the product's positioning collapses.
+
+**Source bugs surfaced this wave, all captured for cleanup (not blocking):**
+
+- MCP-01a CheckerPipeline is envelope-shaped; MCP-03 needed a text-shaped variant. Built `skill_text_check.check_skill_text()` reusing the same primitives — sound but worth refactoring into a single dispatch surface in M1-MCP-04 or a fix ticket.
+- ING-03 classifier LLM providers don't retry on 429/5xx (embedder does). Captured as M1-ING-03b.
+- ING-03 prompt template doesn't annotate which taxonomy entry is the catch-all. Captured as M1-ING-03c.
+
+**Next: Wave 6 — BE-05 (MCP endpoint, reusing BE-04 deps) + ING-04 (ontology inducer) + MCP-04 (skill applier).** All independent.
+
+---
+
+# Orchestrator notes
+
+_The Orchestrator's running diary. Read top entry before deciding what to spawn._
+
 ## 2026-05-22 (Wave 4 integration)
 
 **Spawned in parallel:** Backend (M1-BE-03 tenant provisioner), Ingestion (M1-ING-02 chunker+embedder — fully net-new), MCP-builder (M1-MCP-02 signature collector).

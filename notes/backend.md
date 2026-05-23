@@ -1,5 +1,89 @@
 _Backend engineer's working notes. Newest at top._
 
+## 2026-05-22 — M1-BE-04 done: v1 query API routes
+
+**Result:** 94 tests pass, 2 skip cleanly. 17 new tests (6 query, 3 pages,
+4 ontology, 4 resolver). Existing 77 BE-01/02/03 tests still pass unchanged.
+
+**Test run (sandbox):**
+
+```
+cd services/api
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/vwpyc PYTHONDONTWRITEBYTECODE=1 \
+  python -m pytest -q tests/
+# 94 passed, 2 skipped in 4.39s
+```
+
+**What landed:**
+
+- `routers/v1/__init__.py` — versioned router group, mounted under
+  `/v1` in `app.py` with `tags=["query"]`.
+- `routers/v1/query.py` — `POST /v1/tenants/{tenant_id}/query`.
+  Request: `{q, top_k=8, filters={}}`. Response envelope:
+  `{answer_chunks: [...], pages: [...], query_id: <uuid>, took_ms: <int>}`.
+  Today returns empty lists; the embedding pipeline is real (calls the
+  wired `EmbeddingProvider` exactly once with verbatim `q`). Sketch SQL
+  for the `chunks <=>` cosine-distance query is in-source as a comment
+  for ING-02 to activate.
+- `routers/v1/pages.py` — `GET /v1/tenants/{tenant_id}/pages/{page_id}`.
+  Stub body raises a typed `PageNotFound` (404, `page_not_found`) —
+  ING-05 owns the page builder. Cross-tenant guard still runs first.
+- `routers/v1/ontology.py` — `GET /v1/tenants/{tenant_id}/ontology`.
+  Returns `{root: {id: "root", label: "", kind: "category", children: []}}`
+  by default; `?node_id=...` re-roots. Tests assert shape only.
+- `services_api_tenant.py` — `get_tenant_session` FastAPI dep +
+  `resolve_tenant` helper. Flow: validate API key (existing dep) ->
+  enforce cross-tenant guard -> look up tenant record -> yield
+  `TenantContext` carrying a session. Real Postgres session path uses
+  `SET search_path TO "vw_<slug>", vw_admin` and resets on exit; the
+  default test/dev path yields a `StubAsyncSession` so the in-memory
+  tenant store works end-to-end with no Postgres dependency. Toggle is
+  `app.state.use_real_db_session = True` (production wiring sets it).
+- `deps.py` — added `EmbeddingProvider` duck-typed Protocol +
+  `EmbeddingProviderDep`. Defaults to a process-local stub
+  (`_LocalStubEmbeddingProvider`); production wires the OpenAI
+  provider via `set_embedding_provider(app, ...)` at startup. The api
+  package does NOT runtime-depend on `versawiki_ingestion` — any
+  provider with the right shape works, which keeps the ingestion's
+  canonical `StubEmbeddingProvider` plug-compatible for tests that
+  want determinism.
+- `errors.py` — new typed `TenantScopeMismatch` (403,
+  `tenant_scope_mismatch`). Details carry both `api_key_tenant_id` and
+  `path_tenant_id` for debugging.
+
+**Contract pinned by tests:**
+
+1. **Cross-tenant access is 403, not 404.** A key for tenant A querying
+   tenant B (real or non-existent) gets `tenant_scope_mismatch`. The
+   guard runs before the existence check so 404-vs-403 cannot be used
+   to enumerate tenant ids. Pinned by
+   `test_resolve_tenant_scope_guard_runs_before_existence_check`.
+2. **Empty result keeps the envelope shape.** A query against a tenant
+   with no chunks (which is every tenant today) returns valid JSON of
+   the documented shape — clients can codegen against the OpenAPI spec
+   now and not break when ING-02 fills in the rows. Pinned by
+   `test_query_returns_envelope_shape`.
+3. **Embedding called once per request with the verbatim `q`.** Pinned
+   by `test_query_returns_envelope_shape` + `test_query_defaults_top_k_to_eight`.
+4. **Validation failures never invoke the embedder.** `q=""` returns
+   422 with zero embedder calls. Pinned by `test_query_empty_q_returns_422`.
+
+**Follow-ups for the next backlog wave:**
+
+- BE-05 (MCP endpoint) reuses `get_tenant_session` + `EmbeddingProviderDep`
+  verbatim — the same auth + cross-tenant guard + session path. The
+  MCP route shape becomes JSON-RPC over `/mcp` but the tools call into
+  the same `versawiki_api.routers.v1.query` handler internals.
+- ING-02 swaps `chunks.embedding_stub` (JSON) for `vector(1024)` and
+  activates the in-source sketch SQL in `query.py`.
+- ING-05 (page builder) flips `pages.get_page` from "always 404" to a
+  real lookup; the route shape is already pinned.
+- Production wiring (a future `wsgi.py` or startup hook) sets
+  `app.state.use_real_db_session = True` and installs the OpenAI
+  embedding provider via `set_embedding_provider`.
+
+---
+
 ## 2026-05-22 — M1-BE-03 done: Postgres persistence + tenant provisioner
 
 **Result:** 77 tests pass, 2 skip cleanly. New tests: 50 (12 model-shape,
