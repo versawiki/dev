@@ -27,6 +27,10 @@ from versawiki_ingestion.parsers.base import ParseResult
 # ----------------------------------------------------------------------
 
 
+async def _noop_sleep(_s: float) -> None:
+    return None
+
+
 class FakeAsyncClient:
     def __init__(self, responses: list[Any]) -> None:
         self._responses = list(responses)
@@ -173,25 +177,129 @@ async def test_unknown_type_falls_back_to_unclassified() -> None:
 @pytest.mark.asyncio
 async def test_http_error_degrades_to_novel_pattern() -> None:
     taxonomy = Taxonomy.starter()
-    client = FakeAsyncClient([(500, {"error": "boom"})])
-    classifier = AnthropicClassifier(api_key="sk-test", client=client)
+    # Three 500s — retries exhaust, then degrade.
+    client = FakeAsyncClient(
+        [
+            (500, {"error": "boom"}),
+            (500, {"error": "boom"}),
+            (500, {"error": "boom"}),
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
 
     result = await classifier.classify(_parsed(), taxonomy)
     assert result.confidence == 0.0
     assert result.uncertainty_reason == "NOVEL_PATTERN"
     assert "llm_error" in result.signals
     assert result.signals["llm_error"] == 1.0
+    assert len(client.calls) == 3
 
 
 @pytest.mark.asyncio
 async def test_network_exception_degrades_to_novel_pattern() -> None:
     taxonomy = Taxonomy.starter()
-    client = FakeAsyncClient([httpx.ConnectError("nope", request=None)])  # type: ignore[arg-type]
-    classifier = AnthropicClassifier(api_key="sk-test", client=client)
+    # Three network failures — retries exhaust, then degrade.
+    client = FakeAsyncClient(
+        [
+            httpx.ConnectError("nope", request=None),  # type: ignore[arg-type]
+            httpx.ConnectError("nope", request=None),  # type: ignore[arg-type]
+            httpx.ConnectError("nope", request=None),  # type: ignore[arg-type]
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
 
     result = await classifier.classify(_parsed(), taxonomy)
     assert result.confidence == 0.0
     assert result.uncertainty_reason == "NOVEL_PATTERN"
+    assert len(client.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_retries_on_429_then_succeeds() -> None:
+    taxonomy = Taxonomy.starter()
+    client = FakeAsyncClient(
+        [
+            (429, {"error": "rate"}),
+            (429, {"error": "rate"}),
+            (200, _anthropic_ok("rfi", 0.9)),
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
+
+    result = await classifier.classify(_parsed(), taxonomy)
+    assert result.predicted_type == "rfi"
+    assert result.confidence == 0.9
+    assert len(client.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_retries_on_500_then_succeeds() -> None:
+    taxonomy = Taxonomy.starter()
+    client = FakeAsyncClient(
+        [
+            (500, {"error": "boom"}),
+            (502, {"error": "upstream"}),
+            (200, _anthropic_ok("rfi", 0.9)),
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
+
+    result = await classifier.classify(_parsed(), taxonomy)
+    assert result.predicted_type == "rfi"
+    assert result.confidence == 0.9
+    assert len(client.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_retries_on_network_error_then_succeeds() -> None:
+    taxonomy = Taxonomy.starter()
+    client = FakeAsyncClient(
+        [
+            httpx.ConnectError("x", request=None),  # type: ignore[arg-type]
+            (200, _anthropic_ok("rfi", 0.85)),
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
+
+    result = await classifier.classify(_parsed(), taxonomy)
+    assert result.predicted_type == "rfi"
+    assert result.confidence == 0.85
+    assert len(client.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_non_retryable_4xx_does_not_retry() -> None:
+    taxonomy = Taxonomy.starter()
+    client = FakeAsyncClient([(401, {"error": "auth"})])
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=_noop_sleep)
+
+    result = await classifier.classify(_parsed(), taxonomy)
+    assert len(client.calls) == 1
+    assert result.uncertainty_reason == "NOVEL_PATTERN"
+    assert result.confidence == 0.0
+
+
+@pytest.mark.asyncio
+async def test_sleep_uses_exponential_backoff() -> None:
+    taxonomy = Taxonomy.starter()
+    sleeps: list[float] = []
+
+    async def fake_sleep(d: float) -> None:
+        sleeps.append(d)
+
+    client = FakeAsyncClient(
+        [
+            (500, {"error": "boom"}),
+            (500, {"error": "boom"}),
+            (500, {"error": "boom"}),
+        ]
+    )
+    classifier = AnthropicClassifier(api_key="sk-test", client=client, sleep=fake_sleep)
+
+    result = await classifier.classify(_parsed(), taxonomy)
+    assert result.uncertainty_reason == "NOVEL_PATTERN"
+    # Two sleeps for three attempts: 1.0 * 2^0, 1.0 * 2^1.
+    assert sleeps == [1.0, 2.0]
 
 
 @pytest.mark.asyncio

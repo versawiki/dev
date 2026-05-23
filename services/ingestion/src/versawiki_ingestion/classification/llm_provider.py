@@ -15,6 +15,14 @@ fall back to a low-confidence `unclassified` result on any error or
 malformed response. The orchestrator (`DocumentClassifier`) does the final
 heuristic cross-check and uncertainty-reason assignment.
 
+Retry policy (HTTP providers):
+    Exponential backoff on 429 (rate limit), 5xx (server), and `httpx.HTTPError`
+    exceptions. Max 3 attempts total. Base delay 1s, doubles each attempt
+    (1, 2 sleep on the failures before attempts 2, 3 — no sleep after the
+    third failure; the call degrades to a `NOVEL_PATTERN` `_error_result`
+    rather than raising, matching the classifier's "degrade not raise"
+    contract). Non-retryable 4xx (e.g. 401, 404) degrade immediately.
+
 Tests never make real network calls — they either use `StubLLMClassifier`
 directly or inject a fake `httpx.AsyncClient` into the HTTP providers.
 """
@@ -123,6 +131,8 @@ ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-5"
 ANTHROPIC_API_VERSION = "2023-06-01"
 DEFAULT_MAX_TOKENS = 600
 DEFAULT_TIMEOUT_S = 30.0
+MAX_ATTEMPTS = 3
+BASE_BACKOFF_S = 1.0
 
 
 class AnthropicClassifier:
@@ -132,6 +142,13 @@ class AnthropicClassifier:
     taxonomy + doc excerpt. Errors degrade to `confidence=0.0,
     uncertainty_reason="NOVEL_PATTERN"` rather than raising — the meta-MCP
     skill-write loop is the recovery path, not a re-raise.
+
+    Retry policy:
+        Exponential backoff on 429, 5xx, and `httpx.HTTPError`. Max 3
+        attempts total. Base delay 1s, doubles each attempt. After
+        exhausting retries the call still degrades to a `NOVEL_PATTERN`
+        `_error_result` (it does not re-raise). Non-retryable 4xx (e.g.
+        401, 404) degrade immediately without retrying.
     """
 
     provider_name = "anthropic"
@@ -144,6 +161,8 @@ class AnthropicClassifier:
         client: Optional[httpx.AsyncClient] = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         timeout_s: float = DEFAULT_TIMEOUT_S,
+        max_attempts: int = MAX_ATTEMPTS,
+        base_backoff_s: float = BASE_BACKOFF_S,
         sleep: Any = asyncio.sleep,
     ) -> None:
         self.model = model
@@ -152,7 +171,9 @@ class AnthropicClassifier:
         self._owns_client = client is None
         self.max_tokens = max_tokens
         self.timeout_s = timeout_s
-        self._sleep = sleep  # reserved for retry; kept for API symmetry
+        self.max_attempts = max_attempts
+        self.base_backoff_s = base_backoff_s
+        self._sleep = sleep
 
     async def classify(
         self,
@@ -179,12 +200,17 @@ class AnthropicClassifier:
                 "anthropic-version": ANTHROPIC_API_VERSION,
                 "content-type": "application/json",
             }
-            try:
-                resp = await client.post(ANTHROPIC_MESSAGES_URL, json=payload, headers=headers)
-            except httpx.HTTPError as e:
-                return _error_result(taxonomy, f"http error: {e}")
-            if resp.status_code != 200:
-                return _error_result(taxonomy, f"http {resp.status_code}")
+            resp, error_reason = await _post_with_retries(
+                client,
+                ANTHROPIC_MESSAGES_URL,
+                payload,
+                headers,
+                max_attempts=self.max_attempts,
+                base_backoff_s=self.base_backoff_s,
+                sleep=self._sleep,
+            )
+            if resp is None:
+                return _error_result(taxonomy, error_reason or "unknown http error")
             body = resp.json()
             text = _extract_anthropic_text(body)
             return _parse_llm_json(text, taxonomy)
@@ -214,7 +240,15 @@ OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 
 
 class OpenAIClassifier:
-    """OpenAI chat-completions fallback for document classification."""
+    """OpenAI chat-completions fallback for document classification.
+
+    Retry policy:
+        Exponential backoff on 429, 5xx, and `httpx.HTTPError`. Max 3
+        attempts total. Base delay 1s, doubles each attempt. After
+        exhausting retries the call still degrades to a `NOVEL_PATTERN`
+        `_error_result` (it does not re-raise). Non-retryable 4xx (e.g.
+        401, 404) degrade immediately without retrying.
+    """
 
     provider_name = "openai"
 
@@ -226,6 +260,8 @@ class OpenAIClassifier:
         client: Optional[httpx.AsyncClient] = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         timeout_s: float = DEFAULT_TIMEOUT_S,
+        max_attempts: int = MAX_ATTEMPTS,
+        base_backoff_s: float = BASE_BACKOFF_S,
         sleep: Any = asyncio.sleep,
     ) -> None:
         self.model = model
@@ -234,6 +270,8 @@ class OpenAIClassifier:
         self._owns_client = client is None
         self.max_tokens = max_tokens
         self.timeout_s = timeout_s
+        self.max_attempts = max_attempts
+        self.base_backoff_s = base_backoff_s
         self._sleep = sleep
 
     async def classify(
@@ -263,12 +301,17 @@ class OpenAIClassifier:
                 "Authorization": f"Bearer {self._resolve_api_key()}",
                 "Content-Type": "application/json",
             }
-            try:
-                resp = await client.post(OPENAI_CHAT_URL, json=payload, headers=headers)
-            except httpx.HTTPError as e:
-                return _error_result(taxonomy, f"http error: {e}")
-            if resp.status_code != 200:
-                return _error_result(taxonomy, f"http {resp.status_code}")
+            resp, error_reason = await _post_with_retries(
+                client,
+                OPENAI_CHAT_URL,
+                payload,
+                headers,
+                max_attempts=self.max_attempts,
+                base_backoff_s=self.base_backoff_s,
+                sleep=self._sleep,
+            )
+            if resp is None:
+                return _error_result(taxonomy, error_reason or "unknown http error")
             body = resp.json()
             text = _extract_openai_text(body)
             return _parse_llm_json(text, taxonomy)
@@ -291,6 +334,55 @@ class OpenAIClassifier:
 # ----------------------------------------------------------------------
 # Shared helpers
 # ----------------------------------------------------------------------
+
+
+async def _post_with_retries(
+    client: httpx.AsyncClient,
+    url: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    *,
+    max_attempts: int,
+    base_backoff_s: float,
+    sleep: Any,
+) -> tuple[Optional[httpx.Response], Optional[str]]:
+    """POST `url` with exponential-backoff retries on 429/5xx/httpx.HTTPError.
+
+    Returns `(response, None)` on a successful 200, or `(None, reason)` on
+    a non-retryable status (4xx other than 429) or after exhausting all
+    `max_attempts`. The caller is expected to feed the error reason into
+    `_error_result` so the classifier degrades to `NOVEL_PATTERN` rather
+    than raising.
+    """
+    last_exc: Optional[Exception] = None
+    last_status: Optional[int] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = await client.post(url, json=payload, headers=headers)
+        except httpx.HTTPError as e:
+            last_exc = e
+            if attempt >= max_attempts:
+                return None, f"http error after {max_attempts} attempts: {e}"
+            await sleep(base_backoff_s * (2 ** (attempt - 1)))
+            continue
+
+        if resp.status_code == 200:
+            return resp, None
+        if resp.status_code == 429 or 500 <= resp.status_code < 600:
+            last_status = resp.status_code
+            if attempt >= max_attempts:
+                return None, f"http {last_status} after {max_attempts} attempts"
+            await sleep(base_backoff_s * (2 ** (attempt - 1)))
+            continue
+        # Non-retryable (e.g. 401, 404). Degrade immediately.
+        return None, f"http {resp.status_code}"
+
+    # Defensive fallthrough — should be unreachable.
+    if last_exc is not None:
+        return None, f"http error after {max_attempts} attempts: {last_exc}"
+    if last_status is not None:
+        return None, f"http {last_status} after {max_attempts} attempts"
+    return None, "exhausted retries with no error"
 
 
 def _extract_anthropic_text(body: dict[str, Any]) -> str:
