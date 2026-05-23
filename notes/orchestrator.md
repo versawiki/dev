@@ -2,7 +2,24 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
-## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
+## 2026-05-23 (overnight cron — tick 6 — M1-MCP-05 rebased onto current main, PR #19 opened)
+
+**Situation at tick start:** STATUS.md shows safe list still has M1-MCP-05, M1-QA-01/02/03 queued. Prior ticks (1–5) found the same state. However, the existing M1-MCP-05 branches (`vw-agent/M1-MCP-05-rebased` at `5e5aedf`) were based on `61ac45c` (2 commits behind current `origin/main` at `a71bcc5`) because PRs #12 + merge landed in between. GitHub likely shows the branch as "mergeable" but with a diff that includes the jsonschema removal — a false conflict.
+
+**Action taken:** Created fresh branch `vw-agent/M1-MCP-05-tick6` from current `origin/main`, cherry-picked `5e5aedf` cleanly (no conflicts — the commit doesn't touch `api/pyproject.toml`), ran tests (191 passed, 1 skipped, 0 failed), pushed, opened PR #19.
+
+**Commit cherry-picked:** `5e5aedf` → became `68e9097` on this branch.
+
+**Test delta:** meta-mcp 169 → 191 passed (+22: 21 TenantOptOutStore tests + 1 branching-factor pinning test). 1 pre-existing spaCy skip.
+
+**PR #19:** https://github.com/versawiki/dev/pull/19 — canonical, rebased on `a71bcc5`.
+
+**Action for Josh:**
+1. MERGE PR #19 (canonical, rebased)
+2. CLOSE stale duplicates: PR #2, #9, #13 (all for M1-MCP-05, all superseded)
+3. After merging: update BACKLOG.md to move M1-MCP-05 to Done, then cron can pick M1-QA-01
+
+## 2026-05-23 (overnight cron — STOPPED, 5th consecutive tick — safe list fully queued)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
 
