@@ -2,6 +2,16 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — safe-list queue still fully clogged, tick N+2)
+
+**Status check:** `origin/main` still at `2a9bb51` — no new merges since last tick. All 4 safe-list items remain unmerged: `M1-MCP-05` (PR #22 on `vw-agent/M1-MCP-05-r2`), `M1-QA-01` (`vw-agent/M1-QA-01`), `M1-QA-02` (`vw-agent/M1-QA-02`), `M1-QA-03` (`vw-agent/M1-QA-03`). No new work to do.
+
+**Action taken:** Note only. No new branch, no new PR, no code change. Exiting cleanly.
+
+**Josh's action needed:** Same as previous tick — merge the open PRs so BACKLOG.md can be updated and the cron unblocks. PR #22 is the clean rebased M1-MCP-05 branch.
+
+---
+
 ## 2026-05-23 (overnight cron — safe-list queue still fully clogged, tick N+1)
 
 **Status check:** Scanned BACKLOG.md overnight safe list: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`. None are in Done. All 4 have been implemented by prior ticks and have branches on `origin`:
