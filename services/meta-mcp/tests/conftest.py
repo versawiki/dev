@@ -79,12 +79,10 @@ def payload_ontology_shape() -> dict[str, Any]:
         "kind": "ontology_shape",
         "depth": 4,
         "node_count_bucket": "51-200",
-        # numeric.py classifies these as ratio leaves capped at [0,1]; see
-        # notes/mcp-builder.md for the spec-vs-impl mismatch. We use values
-        # in-band here so the happy-path tests reflect what the pipeline
-        # actually enforces today.
-        "branching_factor_p50": 0.5,
-        "branching_factor_p95": 0.85,
+        # Per spec §3.1, branching factors are real-valued shape statistics,
+        # not ratios or probabilities; values > 1 are normal for real trees.
+        "branching_factor_p50": 2.5,
+        "branching_factor_p95": 7.0,
         "leaf_to_internal_ratio": 0.75,
         "kind_distribution": {"category": 12, "entity": 30, "topic": 8},
         "induced_vs_seed_ratio": 0.4,
