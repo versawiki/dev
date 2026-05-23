@@ -2,6 +2,26 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — tick 10 — safe list still fully queued, no new action)
+
+**Situation at tick start:** All 4 overnight-safe items (`M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) still have open PRs awaiting Josh's review and merge. `origin/main` unchanged since tick 9 — still at `2a9bb51`. 16 open PRs total (4 canonical work PRs + 12 noise/bookkeeping).
+
+**Open PRs (canonical — unchanged):**
+- PR #19 → `vw-agent/M1-MCP-05-tick6` — M1-MCP-05 opt-out API (**merge this one**)
+- PR #16 → `vw-agent/M1-QA-01-rebased` — M1-QA-01 smoke harness (**merge this one**)
+- PR #5  → `vw-agent/M1-QA-02` — M1-QA-02 tenant-isolation property tests
+- PR #7  → `vw-agent/M1-QA-03` — M1-QA-03 privacy-boundary property tests
+
+**Action taken:** None — queue still fully covered. No new code or [needs-review] PR opened; there are already 6+ of them and they provide no new signal.
+
+**Pending action for Josh (unchanged):**
+1. Merge PR #19 (M1-MCP-05 canonical), then update BACKLOG.md to move M1-MCP-05 to Done.
+2. After that, merge PR #16 (M1-QA-01), PR #5 (M1-QA-02), PR #7 (M1-QA-03) in order.
+3. Close stale duplicates: PR #2, #9, #13 (M1-MCP-05 dupes), PR #4 (M1-QA-01 original), PR #3, #8, #10, #14, #15, #17, #18 (bookkeeping noise).
+4. Once BACKLOG.md shows all 4 items Done, cron will have nothing left in the M1 safe list.
+
+---
+
 ## 2026-05-23 (overnight cron — tick 9 — safe list still fully queued, no new action)
 
 **Situation at tick start:** All 4 overnight-safe items (`M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) still have open PRs awaiting Josh's review and merge. `origin/main` unchanged since tick 8 — still at `2a9bb51`. PR #19 HEAD at `2ffac99` (tick-8 notes commit). 16 open PRs total (4 canonical work PRs + 12 noise/bookkeeping).
