@@ -2,6 +2,57 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (tick — STOPPED: overnight safe list fully exhausted, human review needed)
+
+**Picked:** `M1-MCP-05` — top of safe list per STATUS.md/BACKLOG.md.
+
+**What I found:** All four items in the overnight safe list already have open PRs on GitHub.
+The STATUS.md / BACKLOG.md on `origin/main` are stale and have NOT been updated to reflect
+the previous cron ticks' work. The cron will keep re-picking these tickets until the state
+files are updated. **Human action required before the next cron fires.**
+
+Open PRs matching the safe list:
+- `M1-MCP-05` → PR #2 (`vw-agent/M1-MCP-05`, 21 tests, basic version)
+  AND PR #9 (`vw-agent/M1-MCP-05-tick2`, 22 tests + signatures.py bf-fix, more complete)
+- `M1-QA-01` → PR #4 (`vw-agent/M1-QA-01`)
+- `M1-QA-02` → PR #5 (`vw-agent/M1-QA-02`)
+- `M1-QA-03` → PR #7 (`vw-agent/M1-QA-03`)
+
+Additionally open (not safe-list):
+- PR #1: M1-MCP-01a-fix (`vw-agent/M1-MCP-01a-fix`) — note: `a1d6939` already on main
+- PR #3: [needs-review] stale BACKLOG.md
+- PR #6: OPS-04 follow-up auto-merge (`ops-04-autopilot`)
+- PR #8: [needs-review] M1-MCP-01a-fix on main
+
+**My local `vw-agent/M1-MCP-05` branch** has commit `c20c177` — the same superset
+implementation as PR #9 (`vw-agent/M1-MCP-05-tick2`). It cannot be pushed to the remote
+`vw-agent/M1-MCP-05` (non-fast-forward; force-push prohibited).
+
+**Recommended actions for Josh:**
+1. Review and merge (or close) the 9 open PRs in priority order.
+2. Update BACKLOG.md (move M1-MCP-05, M1-QA-01/02/03 to Done).
+3. Update STATUS.md safe list / "next pick" accordingly.
+4. For M1-MCP-05: prefer PR #9 over PR #2 (superset — includes signatures.py fix).
+5. Disable or pause the overnight cron until the queue is replenished.
+
+**Tests run this tick:** meta-mcp 191 passed, 1 skipped, 0 xfailed (clean).
+
+## 2026-05-23 (tick — M1-MCP-05 shipped, PR #9)
+
+**Picked:** `M1-MCP-05` — Per-tenant opt-out flag API + persistence (top of safe list after M1-MCP-01a-fix landed).
+
+**What I found on arrival:**
+- BACKLOG.md on origin/main already had M1-MCP-01a-fix in Done (bookkeeping commit `94e9109`) and safe list pointing to M1-MCP-05.
+- Local `vw-agent/M1-MCP-05` branch existed with old work built on a diverged base (pre-overnight M1-MCP-01a-fix commits). A remote copy of that stale branch also existed on origin.
+- The overnight `a1d6939` fixed `checkers/numeric.py` but missed `collector/signatures.py` — branching factors > 1 still got `_clamp01`'d before reaching the checker.
+
+**What I shipped (commit `c20c177`):**
+- New `versawiki_meta_mcp.opt_out` package: `TenantOptOutStore` (JSON-backed, atomic writes, asyncio-safe) + `load_tenant_config()` integration helper.
+- Companion bug-fix: `collector/signatures.py` `_clamp01(bf_p50/p95)` → `max(0.0, ...)` so values > 1 survive end-to-end; tests updated to match.
+- +22 tests (169 → 191 passed, 1 skipped, 0 xfailed).
+
+**Branch:** `vw-agent/M1-MCP-05-tick2` (not `vw-agent/M1-MCP-05` — stale branch existed on origin; force-push is prohibited). **PR:** #9 at https://github.com/versawiki/dev/pull/9. Old `vw-agent/M1-MCP-05` branch can be deleted after merge.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
