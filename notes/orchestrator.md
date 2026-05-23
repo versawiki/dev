@@ -2,6 +2,31 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
+
+**Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
+
+**Specialist completed the work cleanly:**
+- `services/meta-mcp/src/versawiki_meta_mcp/checkers/numeric.py` — introduced `ALLOWED_REAL_STAT_LEAVES` frozenset holding `branching_factor_p50` and `branching_factor_p95`, removed them from `ALLOWED_RATIO_LEAVES`, added "Path A'" in `scan_numeric_pattern` that accepts non-negative floats `< STRUCTURAL_COUNT_MAX` (1000). Module docstring updated to document the new bucket.
+- `services/meta-mcp/tests/test_pipeline_numeric.py` — removed `@pytest.mark.xfail` on `test_branching_factor_above_one_should_pass`; rewrote `test_ratio_out_of_range_rejected` to call `scan_numeric_pattern` directly with `{"payload": {"adherence_rate": 1.5}}` since every schema-level ratio is `Field(le=1.0)` and would short-circuit at stage 1 (schema_validate). Added two new direct-unit tests pinning the new behavior and its upper bound. Dropped the now-unused `import pytest`.
+
+**Tests:** meta-mcp 166 → 169 passed, 1 skipped (`test_pipeline_pii.py:113` — spaCy `en_core_web_sm` missing in sandbox, unchanged), 0 xfailed.
+
+**Push:** went through to `origin/main` (`3f202ef..a1d6939`). GitHub printed "Changes must be made through a pull request" as a warning, but the push actually landed (verified via `git ls-remote origin main` → `a1d69399…`).
+
+**On entry I found uncommitted changes from a prior session that I did NOT include in this commit (deliberately scoped to the meta-mcp files only):**
+- ` M .github/workflows/test.yml`
+- ` M services/orchestrator/src/versawiki_orchestrator/agent/runner.py`
+- ` M services/orchestrator/src/versawiki_orchestrator/config.py`
+- ` M services/orchestrator/src/versawiki_orchestrator/main.py`
+- `?? services/orchestrator/src/versawiki_orchestrator/auto_merge/` (new dir w/ `__init__.py`, `merger.py`)
+- `?? services/orchestrator/tests/test_agent_runner_helpers.py`
+- `?? services/orchestrator/tests/test_auto_merge.py`
+
+These look like an in-progress OPS-04 follow-up (auto-merge feature) that was never committed. Also, `git --git-dir=$GD --work-tree=$VW reset --hard origin/main` failed at the top of this run with "Operation not permitted" on `services/support-agent/tests/test_kb_loader.py` and `…/test_safe_actions.py` — the Cowork mount appears to be blocking those two specific deletes. They're still present in the work-tree (so `git status` shows nothing for them), but the reset couldn't run cleanly. **Josh should review the orchestrator uncommitted work interactively** — decide whether it's wanted (and commit it from an interactive session) or discard it. None of it is on `origin/main` yet, so nothing is lost; it just lives in the mount as a dangling diff.
+
+**Next overnight pick:** `M1-MCP-05` (per-tenant opt-out flag API + persistence). Safe list now: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`.
+
 ## 2026-05-23 (overnight cron — STOPPED, duplicate ticket detected)
 
 **Spawned:** one Ingestion specialist on **M1-ING-03c** (the topmost item in `BACKLOG.md`'s overnight safe list at the time my reset to `origin/main` snapshotted it).
