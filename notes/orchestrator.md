@@ -2,6 +2,34 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — STOPPED, safe-list queue still fully clogged)
+
+**Situation:** All 4 overnight safe-list items have open PRs on GitHub. No new code was
+implemented this tick. This is at least the 8th tick in a row that has stopped here.
+
+**Safe-list PRs waiting for merge (most recent rebased version of each):**
+
+| Ticket     | PR | Branch                          | Mergeable |
+|------------|----|---------------------------------|-----------|
+| M1-MCP-05  | #19 | vw-agent/M1-MCP-05-tick6       | True (blocked — needs review) |
+| M1-MCP-05  | #13 | vw-agent/M1-MCP-05-rebased     | True (blocked — needs review) |
+| M1-QA-01   | #16 | vw-agent/M1-QA-01-rebased      | open |
+| M1-QA-02   | #5  | vw-agent/M1-QA-02               | open |
+| M1-QA-03   | #7  | vw-agent/M1-QA-03               | open |
+
+**Also open (noise — can be closed):** PRs #2, #3, #8, #9, #10, #14, #15, #17, #18, #20
+are older versions or needs-review duplicates.
+
+**Action required from Josh:**
+1. Pick the cleanest M1-MCP-05 PR (#19 or #13) and merge it.
+2. Merge M1-QA-01 (#16), M1-QA-02 (#5), M1-QA-03 (#7).
+3. Update BACKLOG.md to move those 4 tickets from the safe list to Done.
+4. Close the stale duplicates.
+5. The cron will unblock automatically on the next tick after BACKLOG.md is updated.
+
+**Root cause:** BACKLOG.md is not being updated after PRs are merged, so the cron
+keeps seeing the same tickets as "not Done" and continues creating duplicates.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
