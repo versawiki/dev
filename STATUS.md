@@ -2,14 +2,18 @@
 
 _Read this first. Updated by the Orchestrator at the end of every session._
 
+## Last session summary
+
+- **2026-05-23 overnight cron** — `227f5a2` — M1-ING-03b: Classifier retry on LLM 429/5xx (Anthropic + OpenAI providers, shared `_post_with_retries` helper, exponential backoff matching the embedder pattern). +10 tests in ingestion (215 → 225). All 582 tests green.
+
 ## Current milestone
 
-**M1 — Local-folder ingestion (headless).** End-to-end loop now closed in code. **572 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
+**M1 — Local-folder ingestion (headless).** End-to-end loop closed in code. **582 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
 
 ## Per-service current state
 
-- `services/api/` — **129 tests** (+14 from M1-ING-05's route flip) — Full M1 backend (auth + provisioner + query routes + MCP-over-HTTP + real pages route).
-- `services/ingestion/` — **215 tests** (+35 from M1-ING-05's PageBuilder) — Connector + parsers + chunker/embedder + classifier + ontology inducer + **wiki page builder**.
+- `services/api/` — **129 tests** — Full M1 backend (auth + provisioner + query routes + MCP-over-HTTP + real pages route).
+- `services/ingestion/` — **225 tests** (+10 from M1-ING-03b's classifier retries) — Connector + parsers + chunker/embedder + classifier (now with 429/5xx retry) + ontology inducer + wiki page builder.
 - `services/meta-mcp/` — **166 tests** — Privacy checkers + audit log + signature collector + meta-store + skill writer + skill applier.
 - `services/support-agent/` — **62 tests** — Autonomous CS: KB, safe/forbidden actions, PII redaction, cross-tenant block, intake adapters, escalation queue.
 
@@ -35,7 +39,7 @@ All three protected by the `.vw-*` patterns in `.gitignore`; verified with `git 
 
 ## Overnight cron status
 
-Still live. Next fire in ~ couple of hours. Will pick from the safe list.
+Still live. Safe list now shrunk by one (M1-ING-03b done). Next fire will pick the topmost remaining item.
 
 ## Blockers awaiting Josh
 

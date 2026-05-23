@@ -38,7 +38,7 @@ Prioritized top-to-bottom within each section.
 
 ## Overnight safe list (cron picks from here)
 
-`M1-ING-03b`, `M1-ING-03c`, `M1-MCP-01a-fix`, `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`. (None of the new OPS or CS tickets — they touch external systems / need credentials.)
+`M1-ING-03c`, `M1-MCP-01a-fix`, `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`. (None of the new OPS or CS tickets — they touch external systems / need credentials.)
 
 ## In flight
 
@@ -46,6 +46,7 @@ Prioritized top-to-bottom within each section.
 
 ## Done
 
+- `M1-ING-03b — Classifier retry on LLM 429/5xx (Ingestion)` — `services/ingestion/src/versawiki_ingestion/classification/llm_provider.py`; shared `_post_with_retries` helper, 3 attempts, exponential backoff (1s → 2s → fail-to-degrade). +10 tests (215→225). Commit `227f5a2` (overnight cron).
 - `M1-ING-05 — Wiki page builder (Ingestion)` — `services/ingestion/src/versawiki_ingestion/pages/`; 35 new tests (215 total) + 14 new in api (129 total). Stale-on-event materialisation. Pages route flipped from 404 to real lookup; MCP `read_page` now returns real data.
 - `M1-CS-01 — Customer support agent v1 (Support)` — `services/support-agent/`; 62 tests; safe/forbidden actions; PII redaction; cross-tenant block. Load-bearing tests: `test_cross_tenant_lookup_refused_and_audited_not_escalated`, `test_conversation_log_never_contains_cc_number`.
 - `M1-MCP-04 — Skill applier (MCP-builder)`.
