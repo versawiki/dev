@@ -2,6 +2,52 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — STOPPED, 5th consecutive tick — safe list fully queued)
+
+**Situation at tick start:** STATUS.md clear (no in-flight work). BACKLOG.md overnight
+safe list: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`.
+
+**All four items have open, non-draft, mergeable PRs — this is the 5th consecutive tick
+finding the same blocked state.** No new [needs-review] PR created (would be the 8th
+such draft PR; pure noise at this point). Pushing this update to the existing PR #18
+(`vw-agent/needs-review-tick-4th`) instead.
+
+**Full open-PR inventory as of this tick** (GitHub API confirmed):
+
+| PR   | Status       | Ticket / Topic                        | Branch                             | Action for Josh     |
+|------|--------------|---------------------------------------|------------------------------------|---------------------|
+| #2   | open, non-draft | M1-MCP-05 (original)               | `vw-agent/M1-MCP-05`               | **CLOSE** (superseded by #13) |
+| #4   | open, non-draft | M1-QA-01 (original)                | `vw-agent/M1-QA-01`                | **CLOSE** (superseded by #16) |
+| #5   | open, non-draft | M1-QA-02                           | `vw-agent/M1-QA-02`                | **MERGE** |
+| #7   | open, non-draft | M1-QA-03                           | `vw-agent/M1-QA-03`                | **MERGE** (after #16) |
+| #9   | open, non-draft | M1-MCP-05 (tick-2 duplicate)       | `vw-agent/M1-MCP-05-tick2`         | **CLOSE** (superseded by #13) |
+| #13  | open, non-draft | M1-MCP-05 (rebased, canonical)     | `vw-agent/M1-MCP-05-rebased`       | **MERGE** |
+| #16  | open, non-draft | M1-QA-01 (rebased, canonical)      | `vw-agent/M1-QA-01-rebased`        | **MERGE** |
+| #1   | open, non-draft | M1-MCP-01a-fix                     | `vw-agent/M1-MCP-01a-fix`          | **CLOSE** (already on main as `a1d6939`) |
+| #3   | draft           | [needs-review] tick 1              | `vw-agent/needs-review-20260523`   | **CLOSE** |
+| #8   | draft           | [needs-review] tick 1b             | `vw-agent/M1-MCP-01a-fix-needs-review` | **CLOSE** |
+| #10  | draft           | [needs-review] tick 2              | `vw-agent/needs-review-queue-exhausted` | **CLOSE** |
+| #14  | draft           | [needs-review] tick 3a             | `vw-agent/needs-review-tick-20260523-1724` | **CLOSE** |
+| #15  | draft           | [needs-review] tick 3b             | `vw-agent/needs-review-tick-20260523-1749` | **CLOSE** |
+| #17  | draft           | [needs-review] tick 3c             | `vw-agent/needs-review-tick-20260523-queue-still-full` | **CLOSE** |
+| #18  | draft           | [needs-review] tick 4+5 (this PR)  | `vw-agent/needs-review-tick-4th`   | **CLOSE after merging substantive PRs** |
+
+**Summary of recommended actions for Josh (in order):**
+
+1. **MERGE #13** (M1-MCP-05 canonical)
+2. **MERGE #16** (M1-QA-01 canonical)
+3. **MERGE #5** (M1-QA-02)
+4. **MERGE #7** (M1-QA-03, needs #16 merged first)
+5. **CLOSE** stale/duplicate PRs: #1, #2, #4, #9, #3, #8, #10, #14, #15, #17, #18
+6. **Update BACKLOG.md**: move M1-MCP-05, M1-QA-01/02/03 to Done
+7. **Optionally add M1-CS-02 to the safe list** so the cron can resume productive work
+   (M1-CS-02 is a pure-code refactor — no external systems, no credentials)
+
+**Why the cron is stuck:** Rule 4 prohibits modifying BACKLOG.md, STATUS.md, etc. as
+part of a code ticket. The safe list in BACKLOG.md still lists all 4 items as unfinished,
+but all 4 are implemented and in open PRs. The cron cannot pick a new ticket until either
+(a) those PRs are merged + BACKLOG.md updated by Josh, or (b) a new safe-list item is added.
+
 ## 2026-05-23 (overnight cron — STOPPED, 4th consecutive tick — safe list fully queued)
 
 **Situation at tick start:** STATUS.md clear (no in-flight work). BACKLOG.md overnight
