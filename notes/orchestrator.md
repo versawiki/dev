@@ -2,6 +2,32 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron — STOPPED again, safe list still fully queued)
+
+**Situation at tick start:** Checked STATUS.md (clear — no in-flight work), read BACKLOG.md
+overnight safe list: `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`.
+
+**All four items have open, non-draft, mergeable PRs on origin.** This was already
+flagged by PRs #14 (tick 17:24) and #15 (tick 17:49). No new code work is possible
+without Josh merging those PRs first and updating BACKLOG.md.
+
+**Updated PR table** (one addition since PR #15 was written — PR #16 is a rebased QA-01):
+
+| PR | Ticket | Branch | Status | Recommended action |
+|----|--------|--------|--------|---------------------|
+| #13 | M1-MCP-05 | `vw-agent/M1-MCP-05-rebased` | Mergeable | **MERGE** (supersedes #2 and #9) |
+| #11 | PII UUID fix | `vw-agent/meta-mcp-pii-uuid-skip` | — | **MERGE** (CI hardening) |
+| #16 | M1-QA-01 | `vw-agent/M1-QA-01-rebased` | Mergeable | **MERGE** (supersedes #4; cleaner rebase onto a71bcc5) |
+| #5  | M1-QA-02 | `vw-agent/M1-QA-02` | Mergeable | **MERGE** |
+| #7  | M1-QA-03 | `vw-agent/M1-QA-03` | Mergeable | **MERGE** (needs #16 or #4 merged first) |
+
+**PRs to close as duplicates/noise after merging:** #2, #4, #9 (old MCP-05/QA-01 copies),
+#3, #8, #10, #14, #15, and this tick's draft.
+
+**For cron to resume productive work:** merge the above, then update BACKLOG.md (move
+all four to Done) and add new safe-list entries (M1-CS-02 is next in Ready but not yet
+on the safe list — Josh to decide if it belongs there).
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
