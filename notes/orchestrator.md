@@ -2,6 +2,29 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-23 (overnight cron tick 17:49 — STOPPED again, safe list still fully queued)
+
+**Situation identical to tick 17:24 (PR #14):** all 4 overnight safe-list items still
+have open non-draft PRs and BACKLOG.md is unchanged.
+
+| Ticket | Open PR | Status |
+|---|---|---|
+| M1-MCP-05 | #2, #9, #13 (3 duplicates; #13/rebased is cleanest) | unmerged |
+| M1-QA-01 | #4 | unmerged |
+| M1-QA-02 | #5 | unmerged |
+| M1-QA-03 | #7 | unmerged |
+
+**Existing `[needs-review]` PRs still open:** #3, #8, #10, #14.
+
+**What Josh needs to do (unchanged from PR #14):**
+1. Merge #13 (M1-MCP-05), #4 (M1-QA-01), #5 (M1-QA-02), #7 (M1-QA-03).
+2. Close duplicate M1-MCP-05 PRs #2 and #9.
+3. Move all four tickets to Done in BACKLOG.md and update STATUS.md.
+4. Close stale `[needs-review]` PRs once BACKLOG.md is current.
+5. Add new safe-list entries so the cron can resume productive work.
+
+**This tick opened:** draft PR `[needs-review] tick 17:49 — same queue-full, see PR #14`.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
