@@ -53,3 +53,4 @@ pytest-cache-files-*/
 # Credentials — never commit
 .git-credentials
 .vw-cron-token
+.vw-*-key
