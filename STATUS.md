@@ -4,6 +4,7 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Last session summary
 
+- **2026-05-24 overnight cron** — `20c556b` — M1-QA-02: tenant-isolation property tests (ingestion). New `services/ingestion/tests/e2e/test_tenant_isolation_properties.py` (406 lines, 7 `@pytest.mark.asyncio` tests) drives `InMemoryPageStore` with a seeded `random.Random` (SEED=20260524) across N=20+ tenants per scenario, with intentional id/slug/node-id collisions across tenants. Covers: `get`, `get_by_slug`, `list_for_node`, `mark_stale` never crossing tenants (several hundred cross-tenant probes per test), same-id and same-slug across tenants stay isolated, and `asyncio.gather`'d concurrent upserts across tenants don't leak. Self-contained file (local `_page()` helper mirrors `test_page_store_inmemory.py`). No new deps, no production code touched. ingestion 238 → 245 (+7). New file passes 7 in 0.04s; full ingestion suite 245 passed in 3.60s.
 - **2026-05-23 overnight cron** — `23b767e` — M1-QA-01: end-to-end smoke harness (ingestion). New `services/ingestion/tests/e2e/` (conftest + 8 async tests) drives `LocalFolderConnector` → `process_document` → `OntologyInducer` → `PageBuildPipeline` → `InMemoryPageStore` end-to-end on a 7-file synthetic corpus using `StubLLMClassifier`/`StubEmbeddingProvider`/`StubPageWriter`. Covers: corpus processed, tree built, ≥1 page, id+slug retrievability, four section headers in `body_markdown`, no self-loop in `related_page_ids`, tenant isolation (cross-tenant `get` returns None), determinism over two runs (Metadata "Last updated" line stripped). No new deps, no cross-service imports. ingestion 230 → 238 (+8). Out-of-scope follow-up flagged: M1-QA-01b (over-the-wire FastAPI smoke that crosses ingestion → api).
 - **2026-05-23 overnight cron** — `e928f72` — M1-MCP-05: per-tenant opt-out flag API + persistence. Adds `opt_out_signature_sharing` Boolean column to `vw_admin.tenants` (alembic `20260523_0002`), threads it through `TenantRecord` + both `TenantStore` impls (`InMemory` + `Postgres`) with a `set_opt_out` mutator, and exposes a new `PATCH /v1/admin/tenants/{tenant_id}/opt-out` admin route. The meta-MCP consumer side (`TenantSignatureConfig.opt_out` in collector + applier) is unchanged. +12 tests in api (129 → 141, 2 pre-existing integration skips unchanged).
 - **2026-05-23 overnight cron** — `a1d6939` — M1-MCP-01a-fix: numeric checker accepts `branching_factor_p50/p95` as real-valued statistics (non-negative floats < STRUCTURAL_COUNT_MAX), no longer ratio-clamped at [0,1]. New `ALLOWED_REAL_STAT_LEAVES` bucket in `numeric.py`. xfail on `test_branching_factor_above_one_should_pass` removed; `test_ratio_out_of_range_rejected` rewritten to bypass schema; +2 new unit tests. meta-mcp: 166 → 169 passed, 1 skipped (unchanged), 0 xfailed.
@@ -14,12 +15,12 @@ _Read this first. Updated by the Orchestrator at the end of every session._
 
 ## Current milestone
 
-**M1 — Local-folder ingestion (headless).** End-to-end loop closed in code. **610 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
+**M1 — Local-folder ingestion (headless).** End-to-end loop closed in code. **617 tests passing** across four services. An ingested folder produces queryable wiki pages all the way through the system.
 
 ## Per-service current state
 
 - `services/api/` — **141 tests** (+12 from M1-MCP-05's opt-out PATCH route + persistence) — Full M1 backend (auth + provisioner + query routes + MCP-over-HTTP + real pages route + per-tenant opt-out admin surface).
-- `services/ingestion/` — **238 tests** (+8 from M1-QA-01's end-to-end smoke harness) — Connector + parsers + chunker/embedder + classifier (with 429/5xx retry + catch-all annotation in prompt) + ontology inducer + wiki page builder.
+- `services/ingestion/` — **245 tests** (+7 from M1-QA-02's tenant-isolation property tests on `InMemoryPageStore`) — Connector + parsers + chunker/embedder + classifier (with 429/5xx retry + catch-all annotation in prompt) + ontology inducer + wiki page builder.
 - `services/meta-mcp/` — **169 tests** — Privacy checkers + audit log + signature collector + meta-store + skill writer + skill applier.
 - `services/support-agent/` — **62 tests** — Autonomous CS: KB, safe/forbidden actions, PII redaction, cross-tenant block, intake adapters, escalation queue.
 
@@ -45,7 +46,7 @@ All three protected by the `.vw-*` patterns in `.gitignore`; verified with `git 
 
 ## Overnight cron status
 
-Still live. Safe list shrunk by one more (M1-QA-01 now Done via `23b767e`). Remaining: `M1-QA-02`, `M1-QA-03`. Next fire's top pick: `M1-QA-02` (tenant-isolation property tests).
+Still live. Safe list shrunk by one more (M1-QA-02 now Done via `20c556b`). Remaining: `M1-QA-03`. Next fire's top pick: `M1-QA-03` (privacy-boundary property tests).
 
 ## Blockers awaiting Josh
 
