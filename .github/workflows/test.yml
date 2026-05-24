@@ -1,10 +1,20 @@
 name: test
 
+# Only run when something that actually affects the tests changes.
+# Markdown-only / notes-only commits won't burn CI minutes or spam emails.
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'services/**'
+      - '.github/workflows/test.yml'
+      - 'pyproject.toml'
   push:
     branches: [main]
+    paths:
+      - 'services/**'
+      - '.github/workflows/test.yml'
+      - 'pyproject.toml'
 
 permissions:
   contents: read
