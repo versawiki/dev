@@ -2,6 +2,17 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-24 (overnight cron — STOPPED, safe list still exhausted, 2nd fire today)
+
+**No ticket picked. No specialist spawned.**
+
+Second overnight cron firing of 2026-05-24 (this one at ~16:08 UTC; the first was the entry below at ~12:09 UTC). State is unchanged on `origin/main` — `STATUS.md` and `BACKLOG.md` both still mark the overnight safe list as `Exhausted`, last real ticket landed was `M1-QA-03` (`d906ce9`). Confirmed via fresh clone + `core.fileMode false` (mount surfaces an 8-file executable-bit drift with zero content delta — same finding as the 12:09 fire; untracked `services/api/pyproject.toml.testwrite` still sitting in the worktree, not staged).
+
+Per task file's hard rule, stopping cleanly without spawning. Until Josh re-stocks the safe list interactively, every overnight fire will land here.
+
+**Same candidates flagged below — no new analysis to add.**
+
+
 ## 2026-05-24 (overnight cron — STOPPED, safe list exhausted)
 
 **No ticket picked. No specialist spawned. No commit.**
