@@ -28,13 +28,12 @@ Prioritized top-to-bottom within each section.
 
 **QA**
 
-- `M1-QA-01 — End-to-end smoke harness`.
 - `M1-QA-02 — Tenant-isolation property tests`.
 - `M1-QA-03 — Privacy-boundary property tests`.
 
 ## Overnight safe list (cron picks from here)
 
-`M1-QA-01`, `M1-QA-02`, `M1-QA-03`. (None of the new OPS or CS tickets — they touch external systems / need credentials.)
+`M1-QA-02`, `M1-QA-03`. (None of the new OPS or CS tickets — they touch external systems / need credentials.)
 
 ## In flight
 
@@ -42,6 +41,7 @@ Prioritized top-to-bottom within each section.
 
 ## Done
 
+- `M1-QA-01 — End-to-end smoke harness (QA / Ingestion)` — `services/ingestion/tests/e2e/` (net-new package: `__init__.py`, `conftest.py`, `test_smoke_local_folder_to_pages.py`). Single-process, stub-LLM-driven smoke that exercises `LocalFolderConnector → process_document → OntologyInducer → PageBuildPipeline → InMemoryPageStore` end-to-end on a 7-file synthetic corpus (mixed `.txt`/`.eml`/`.xlsx`, RFI + meeting-minutes shapes, one tiny rollup file). 1 module-scoped `smoke_result` fixture runs the heavy pipeline once; 8 async tests cover: corpus processed, ontology tree built, ≥1 page produced, id+slug retrievability, four expected section headers in `body_markdown`, no self-loop in `related_page_ids`, cross-tenant `get` returns None, determinism over two runs (Metadata "Last updated" line stripped before compare). No new deps; no cross-service imports. Three implementation notes worth flagging for the M1-QA-01b follow-up: (i) `WikiPage` field is `body_markdown` not `body_md`; (ii) `classifier_results` is keyed by `document_content_hash` (not `source_uri`); (iii) slug uniqueness is not guaranteed by the store contract — two distinct nodes with the same inducer label can collide on slug, so the by-slug test asserts only that *some* page with the matching slug comes back. +8 tests in ingestion (230 → 238). Commit `23b767e` (overnight cron).
 - `M1-MCP-05 — Per-tenant opt-out (MCP-builder / Backend)` — `opt_out_signature_sharing` Boolean column added to `vw_admin.tenants` (alembic `20260523_0002`); threaded through `TenantRecord` + `InMemoryTenantStore` + `PostgresTenantStore` with a `set_opt_out(tenant_id, opt_out_signature_sharing=...)` mutator; surfaced on `TenantOut`; new admin-scoped `PATCH /v1/admin/tenants/{tenant_id}/opt-out` route with structured 404 on unknown tenant and `extra='forbid'` request body. Meta-MCP consumer side (`TenantSignatureConfig.opt_out` honored in collector + applier) was already wired and is unchanged. +12 tests in api (129 → 141). Commit `e928f72` (overnight cron).
 - `M1-MCP-01a-fix — Branching-factor real-stat band (MCP-builder)` — `services/meta-mcp/src/versawiki_meta_mcp/checkers/numeric.py`; new `ALLOWED_REAL_STAT_LEAVES` bucket holds `branching_factor_p50/p95` as non-negative floats < `STRUCTURAL_COUNT_MAX` (1000) instead of ratio-clamped at [0,1]. xfail on `test_branching_factor_above_one_should_pass` removed; `test_ratio_out_of_range_rejected` rewritten to bypass the schema (use `adherence_rate` direct-unit call) since every schema-level ratio is `Field(le=1.0)` and would short-circuit at stage 1. +2 new unit tests (real-stat passes, > MAX rejected). meta-mcp 166 → 169 passed. Commit `a1d6939` (overnight cron).
 - `M1-ING-03c — Taxonomy (catch-all) annotation in classifier prompt (Ingestion)` — `services/ingestion/src/versawiki_ingestion/classification/prompts.py` gains a `catch_all_types` kwarg; both LLM providers pass `{taxonomy.default_type, taxonomy.unclassified_type}`. +5 tests in ingestion (225→230). Commit `087a59c` (landed independently of the overnight cron; the cron detected the duplicate at push time, abandoned its own `54ddb1b`, and updated bookkeeping — see `notes/orchestrator.md`).
