@@ -2,6 +2,29 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-24 (overnight cron — STOPPED, safe list exhausted)
+
+**No ticket picked. No specialist spawned. No commit.**
+
+Pre-flight check found the overnight safe list exhausted on `origin/main` (`408d422`):
+
+- `STATUS.md` line 50: "Overnight safe list now **exhausted** (M1-QA-03 done via `d906ce9`). On the next overnight fire the orchestrator should detect the empty list and stop cleanly..."
+- `BACKLOG.md` line 31 under "Overnight safe list (cron picks from here)": "**Exhausted.** All previously-listed overnight-safe tickets are Done as of `d906ce9` (2026-05-24, M1-QA-03)."
+
+Per the task file's hard rule ("If all overnight-safe items are Done, STOP cleanly — leave a note in `notes/orchestrator.md` saying 'overnight safe list exhausted; pick a new ticket interactively.'"), I am stopping here without spawning any specialist.
+
+**Candidates flagged in both STATUS.md and BACKLOG.md for the next safe-list refresh (interactive, with Josh's blessing):**
+
+- `M1-ING-06` — re-indexing scheduler (pure ingestion-side, no external services)
+- Low-risk subset of `CS-02` — native tool-use refactor of the support agent
+
+**Other things Josh may want to eyeball when next interactive:**
+
+- An untracked leftover `services/api/pyproject.toml.testwrite` (zero bytes) is present in the mount and can't be removed from the cron sandbox ("Operation not permitted"). It is NOT staged or committed. Likely a stray test write from an earlier interactive session — safe to `rm` locally.
+- The FUSE mount surfaced 8 files as "modified" with zero content delta (executable-bit drift). Cleared by setting `core.filemode false` on the cron's split git-dir; no impact on `origin/main`.
+
+**Next overnight fire:** still nothing safe-listed. Until the safe list is re-stocked interactively, every overnight run will land here and stop cleanly.
+
 ## 2026-05-23 (overnight cron — picked M1-MCP-01a-fix; pushed `a1d6939`)
 
 **Spawned:** one MCP-builder specialist on **M1-MCP-01a-fix** (topmost overnight-safe item, per `STATUS.md`'s call-out: "Next fire's top pick: M1-MCP-01a-fix").
