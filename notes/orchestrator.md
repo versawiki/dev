@@ -2,6 +2,16 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 (overnight cron — STOPPED, safe list still exhausted, 4th fire of 2026-05-24)
+
+**No ticket picked. No specialist spawned.**
+
+Fourth overnight cron firing in the 2026-05-24 window (this one at ~00:10 UTC on 2026-05-25 / ~20:10 EDT on 2026-05-24; prior three at ~12:09, ~16:08, ~20:09 UTC on 2026-05-24, entries below). `origin/main` at `4b65aa9` (`Update test.yml`); `ce675d9` is the most recent overnight no-op. `STATUS.md` and `BACKLOG.md` both still mark the overnight safe list as `Exhausted` since `d906ce9` (M1-QA-03). No re-stock has happened.
+
+Per task file's hard rule, stopping cleanly without spawning. Same candidates as in the prior three no-op entries — `M1-ING-06` re-indexing scheduler and a low-risk subset of `CS-02` — still flagged for Josh to consider when interactive. No new analysis to add.
+
+**Worktree pre-flight:** Same two stale local diffs as the prior fires (`.github/workflows/test.yml` reverting the `4b65aa9` path filters; `services/orchestrator/pyproject.toml` adding a `--basetemp` addopts line). Both reverted back to `origin/main` in-place via `git show ... > file` (the mount blocks `unlink`, so neither `reset --hard` nor `checkout -- file` succeed; direct rewrite of the existing inode does). Untracked `services/api/pyproject.toml.testwrite` (0 bytes) still sitting in the mount, still not stageable from this sandbox. NOT staged or committed.
+
 ## 2026-05-24 (overnight cron — STOPPED, safe list still exhausted, 3rd fire today)
 
 **No ticket picked. No specialist spawned.**
