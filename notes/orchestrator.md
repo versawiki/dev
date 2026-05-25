@@ -2,6 +2,22 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 12:08 UTC (overnight cron — STOPPED, safe list still exhausted, 7th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Seventh consecutive overnight no-op since `d906ce9` (M1-QA-03, 2026-05-24). All seven safe-list tickets (`M1-ING-03b`, `M1-ING-03c`, `M1-MCP-01a-fix`, `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) re-verified Done in `BACKLOG.md` with commit SHAs; `STATUS.md` line 31/50 still reads `Exhausted`. `origin/main` at `2ffdf10` (6th-consecutive no-op).
+
+**Josh — please pick one when you have a minute:**
+  (a) Pause the `vw-overnight` scheduled task in Cowork until the safe list is re-stocked. This is the cleanest path.
+  (b) Edit `SKILL.md` Step 2 so subsequent same-day no-ops return *silently* without committing — e.g. "if the most recent commit on `origin/main` is already a no-op entry from within the last 20 hours, exit without writing or committing."
+  (c) Re-stock the safe list interactively. Standing candidates: `M1-ING-06` (re-indexing scheduler, pure ingestion-side, no external services), or a low-risk subset of `CS-02` (native tool-use refactor of support agent).
+
+Until one of those happens, the cron will mechanically keep landing one of these entries per fire. Token spend per fire is small but non-zero, and the commit log is getting noisy (7 no-ops since 2026-05-24).
+
+**Worktree pre-flight:** Same FUSE-mount artefacts as prior fires — 8 zero-line "M" diffs (executable-bit / timestamp drift, no real content), two untracked stray files (`.test-write`, `services/api/pyproject.toml.testwrite`) still in the mount and neither stageable from this sandbox. Targeted `git add notes/orchestrator.md` used to avoid staging any of the cosmetic phantoms. Token (.vw-cron-token) read OK; never printed; never staged.
+
+
 ## 2026-05-25 08:09 UTC (overnight cron — STOPPED, safe list still exhausted, 6th consecutive no-op)
 
 **No ticket picked. No specialist spawned.**
