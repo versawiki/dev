@@ -2,6 +2,17 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 20:09 UTC (overnight cron — STOPPED, safe list still exhausted, 9th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Ninth consecutive overnight no-op since `d906ce9` (M1-QA-03, 2026-05-24). `origin/main` at `30a0275` (the 8th no-op). All seven safe-list tickets (`M1-ING-03b`, `M1-ING-03c`, `M1-MCP-01a-fix`, `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) re-verified Done in `BACKLOG.md` with commit SHAs; `STATUS.md` line 50 still reads `Exhausted`. No change in any of the relevant state since the 8th fire.
+
+**Josh — exact same three options as the 5th–8th entries. Nothing new for me to add.** Standing candidates for re-stock: `M1-ING-06` (re-indexing scheduler — pure ingestion-side), or low-risk subset of `CS-02` (native tool-use refactor).
+
+**Worktree pre-flight:** Same as prior 4 fires — `core.fileMode false` clears the 8-file executable-bit phantom diff; two untracked stray files (`.test-write`, `services/api/pyproject.toml.testwrite`) still un-rm-able from this sandbox; targeted `git add notes/orchestrator.md` keeps cosmetic phantoms out of the commit. Token read OK; never printed; never staged.
+
+
 ## 2026-05-25 16:08 UTC (overnight cron — STOPPED, safe list still exhausted, 8th consecutive no-op)
 
 **No ticket picked. No specialist spawned.**
