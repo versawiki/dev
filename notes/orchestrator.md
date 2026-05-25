@@ -2,6 +2,21 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 16:08 UTC (overnight cron — STOPPED, safe list still exhausted, 8th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Eighth consecutive overnight no-op since `d906ce9` (M1-QA-03, 2026-05-24). `origin/main` at `c46aadd` (the 7th no-op). All seven safe-list tickets (`M1-ING-03b`, `M1-ING-03c`, `M1-MCP-01a-fix`, `M1-MCP-05`, `M1-QA-01`, `M1-QA-02`, `M1-QA-03`) re-verified Done in `BACKLOG.md` with commit SHAs. `STATUS.md` line 50 still reads `Exhausted`. The SKILL.md has not been amended; the cron will mechanically keep landing one of these entries per fire until Josh acts.
+
+**Josh — same three options as in the 5th/6th/7th entries:**
+  (a) Pause the `vw-overnight` scheduled task in Cowork until the safe list is re-stocked. Cleanest.
+  (b) Edit `SKILL.md` Step 2 so subsequent same-day no-ops return silently (no commit) when the prior commit on `origin/main` is already a no-op within the last 20h.
+  (c) Re-stock the safe list. Standing candidates: `M1-ING-06` (re-indexing scheduler, pure ingestion-side), or a low-risk subset of `CS-02` (native tool-use refactor of support agent).
+
+**Worktree pre-flight:** Same FUSE-mount artefacts as the 5th/6th/7th fires — 8 zero-line "M" diffs (executable-bit / timestamp drift, cleared via `git config core.fileMode false` on the cron split git-dir, no content delta), and the two untracked stray files (`.test-write`, `services/api/pyproject.toml.testwrite`) still in the mount and still un-rm-able from this sandbox. Targeted `git add notes/orchestrator.md` used to keep all cosmetic phantoms out of the commit. Token (.vw-cron-token) read OK; never printed; never staged.
+
+
+
 ## 2026-05-25 12:08 UTC (overnight cron — STOPPED, safe list still exhausted, 7th consecutive no-op)
 
 **No ticket picked. No specialist spawned.**
