@@ -2,6 +2,16 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 08:09 UTC (overnight cron — STOPPED, safe list still exhausted, 6th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Sixth consecutive overnight no-op since `d906ce9`. Second fire of the EDT-day-2026-05-25 (prior fire at ~04:08 UTC was the first EDT-day-of-2026-05-25 entry). Per the SKILL.md hard rule, leaving this note. Per the 5th-consecutive entry's own suggestion to itself, this is exactly the kind of fire that should be stopping silently — but the task file has not been amended, so the cron mechanically keeps committing.
+
+**Reiterating the ask from prior no-ops:** Josh, either (a) pause the overnight schedule until the safe list is re-stocked, or (b) edit the SKILL.md so subsequent no-ops within an EDT day return without committing. Candidates for re-stock unchanged: `M1-ING-06`, low-risk subset of `CS-02`.
+
+**Worktree pre-flight:** same as prior 5 fires — 8-file executable-bit drift cleared via `-c core.fileMode=false`, two untracked stray files (`.test-write`, `services/api/pyproject.toml.testwrite`) still in the mount, neither stageable, neither committed.
+
 ## 2026-05-25 04:08 UTC (overnight cron — STOPPED, safe list still exhausted, 5th consecutive no-op)
 
 **No ticket picked. No specialist spawned.**
