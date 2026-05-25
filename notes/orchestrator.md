@@ -2,6 +2,17 @@
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
 
+## 2026-05-25 04:08 UTC (overnight cron — STOPPED, safe list still exhausted, 5th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Fifth consecutive overnight no-op since the safe list was emptied by `d906ce9` on 2026-05-24. Prior four entries below (last one at ~00:10 UTC on 2026-05-25 ≈ 20:10 EDT 2026-05-24; this one ~4h later at 04:08 UTC ≈ 00:08 EDT 2026-05-25, first fire of the 2026-05-25 EDT day). `STATUS.md` and `BACKLOG.md` still mark the overnight safe list as `Exhausted`; no human re-stock between fires.
+
+Per the task file's hard rule, stopping cleanly without spawning. Candidates for the next safe-list refresh (interactive, with Josh's blessing) remain unchanged: `M1-ING-06` re-indexing scheduler, or a low-risk subset of `CS-02`.
+
+**Suggestion for Josh:** the cron is now noisily logging the same exhausted state several times a day. Two cheap fixes either (a) pause the overnight schedule until you re-stock the safe list, or (b) raise the no-op threshold — e.g. only commit a fresh `notes/orchestrator.md` entry on the first no-op of each EDT day, otherwise stop silently. Whichever is easier.
+
+**Worktree pre-flight:** Same FUSE mount artefacts as prior fires — 8 files surfacing as executable-bit drift with zero content delta (cleared with `git config core.fileMode false` on the cron's split git-dir; no impact on `origin/main`). Two untracked zero-byte stray files still sitting in the mount (`.test-write`, `services/api/pyproject.toml.testwrite`) — neither stageable from the cron sandbox, neither committed. Both safe to `rm` locally next time you're at the keyboard.
 ## 2026-05-25 (overnight cron — STOPPED, safe list still exhausted, 4th fire of 2026-05-24)
 
 **No ticket picked. No specialist spawned.**
