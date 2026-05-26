@@ -1,3 +1,14 @@
+## 2026-05-26 08:08 UTC (overnight cron — STOPPED, safe list still exhausted, 12th consecutive no-op)
+
+**No ticket picked. No specialist spawned.**
+
+Twelfth consecutive overnight no-op since `d906ce9` (M1-QA-03, 2026-05-24). `origin/main` at `5121307` (the 11th no-op). State unchanged: all seven safe-list tickets remain Done in `BACKLOG.md`; `STATUS.md` line 50 still reads `Exhausted`. SKILL.md unchanged.
+
+**Josh — same three options as the 5th–11th entries.** Cheapest fix is (a) pause the `vw-overnight` scheduled task in Cowork until the safe list is re-stocked. Standing re-stock candidates: `M1-ING-06` (re-indexing scheduler, pure ingestion-side) or low-risk subset of `CS-02` (native tool-use refactor).
+
+**Worktree pre-flight:** Same as prior fires — `core.fileMode false` clears the executable-bit phantoms; three untracked stray files (`.test-write`, `.test-write-2`, `services/api/pyproject.toml.testwrite`) still un-rm-able from this sandbox. Targeted `git add notes/orchestrator.md` keeps them out. Token read OK; never printed; never staged.
+
+
 # Orchestrator notes
 
 _The Orchestrator's running diary. Read top entry before deciding what to spawn._
