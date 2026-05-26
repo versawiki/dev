@@ -20,7 +20,6 @@ Prioritized top-to-bottom within each section.
 **Operations (new — Josh-driven mostly)**
 
 - `OPS-02 — Apple Developer + Google Play accounts` — Per `docs/operations/app-store-prep.md`.
-- `OPS-03 — LLC + bank + EIN` — **Florida chosen.** File via Sunbiz.org ($125) + EIN from IRS (free) + Mercury bank account + registered agent. Skip Stripe Atlas (Delaware-only). See `docs/operations/llc-and-business.md` (Florida addendum).
 - `OPS-04b — Orchestrator disposition + SMTP fix` — Decide act / observe / disable for the deployed-but-stopped `versawiki-orchestrator` container on the VM. Before any resume: verify SMTP escalation actually fires (the 2026-05-23 run hit `needs_review` dozens of times without emailing). If staying in act mode, also re-stock the overnight safe list so the agent has fresh work. See `notes/orchestrator.md` for forensics.
 - `OPS-05 — Privacy policy + ToS + DPA drafts` — Termly/Iubenda templates, then lawyer review.
 - `OPS-06 — Production infrastructure (Fly + Neon + R2 accounts)` — Just-in-time before M1 deploy.
@@ -32,7 +31,8 @@ Prioritized top-to-bottom within each section.
 
 ## In flight
 
-_(none — both autonomous agents stopped on 2026-05-26 pending Josh's disposition decisions; see STATUS.md "Autonomous agents status" and "Next interactive tickets")_
+- `OPS-03 — LLC + bank + EIN (Florida)` — 2026-05-26: registered agent decision = **Northwest Registered Agent** ($125/yr); LLC name = **Versawiki LLC** (Sunbiz availability confirmed, no conflicts among nearby `VERSAW*` entries). Northwest engaged for full LLC formation bundle (their service files the Articles of Organization with the state). Sunbiz filing ETA **2026-05-29**. EIN application filed today; issuance ETA this week (Northwest's standard online filing). Next dependencies: Mercury bank account application (blocked on Sunbiz PDF + EIN confirmation), operating agreement template (can draft in parallel), Florida annual report reminder for 2027-05-01. See `docs/operations/llc-and-business.md` Florida addendum and `notes/orchestrator.md` for the decision trail.
+- _(both autonomous agents — Cowork vw-overnight cron and VM versawiki-orchestrator — stopped on 2026-05-26 pending Josh's disposition decisions; see STATUS.md "Autonomous agents status" and "Next interactive tickets")_
 
 ## Done
 
