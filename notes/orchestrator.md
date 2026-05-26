@@ -1,3 +1,19 @@
+## 2026-05-26 12:52 UTC (interactive — Josh + Claude — OPS-04 triage and recovery)
+
+**Discovery.** On a routine status check, found `versawiki-orchestrator` running on the VM (`project-mcp-server`, `/home/joshuafausset/versawiki-orchestrator/`, `Up 2 days (healthy)`, mode=`act`, `paused=true`). 68,404-row audit log, hash chain verified. STATUS.md and BACKLOG.md were stale — both still said "OPS-04 in flight, Josh next: paste-and-build," which is what caused the Cowork overnight cron to also pick M1-MCP-05 every fire.
+
+**What happened on the VM (2026-05-23 ~16:52–19:50 UTC).** Orchestrator started in `act` mode with branch-protection warning (no `required_status_checks`, not fatal). Every ~5-min tick picked **M1-MCP-05** off the top of the safe list, didn't notice the Cowork cron had merged it that morning (`e928f72`), found existing branches, opened a fresh duplicate PR, looped. Hit `$20.20/$20` daily cap at ~19:50 and auto-paused. **Auto-merger correctly refused all 19 PRs** (`too_many_lines`/`needs_review`/`no_checks` — safety guardrails worked).
+
+**Recovery actions (2026-05-26 ~08-09 UTC):**
+1. `docker stop versawiki-orchestrator` → `Exited (0)`.
+2. Closed all 19 open PRs on `versawiki/dev` via REST API, each with an explanatory comment pointing at the commit that landed the work on main. Branches retained for forensics.
+3. Paused the Cowork `vw-overnight` scheduled task via `mcp__scheduled-tasks__update_scheduled_task` (had hit 12 consecutive no-ops since 2026-05-24).
+4. Rewrote STATUS.md and BACKLOG.md to reflect "deployed → stopped, awaiting disposition." Added a new ticket `OPS-04b — Orchestrator disposition + SMTP fix` to Operations/Ready.
+
+**Open question for Josh — SMTP escalation gap.** The orchestrator hit `needs_review` auto-merge refusals dozens of times across the 3-hour run window. No `escalation_sent` event appears in the audit tail. Either (a) `VW_ORCH_SMTP_*` env vars in `/etc/versawiki/orchestrator.env` weren't filled in at deploy time and we don't know it failed silently, or (b) the escalation trigger logic doesn't fire on `auto_merge_decision: needs_review`. Recommended next step before any resume: `docker start versawiki-orchestrator` briefly, hit the control API to send a test escalation, confirm receipt at joshuafausset@hotmail.com, then stop again.
+
+**State on `origin/main` after this session:** 627 tests still passing. `bash# git log --oneline -3 origin/main` should show: `b4a8064 [overnight] No-op (12th consecutive)`, then prior overnight no-ops. No code changes today — only STATUS/BACKLOG/notes.
+
 ## 2026-05-26 08:08 UTC (overnight cron — STOPPED, safe list still exhausted, 12th consecutive no-op)
 
 **No ticket picked. No specialist spawned.**
