@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ record.title }} - Versawiki demo{% endblock %}
+{% block content %}
+  <div class="grid grid-cols-1 md:grid-cols-[1fr_18rem] gap-8">
+    <article class="wiki-body bg-white border border-stone-200 rounded-md p-8 shadow-sm">
+      <h1>{{ record.title }}</h1>
+      {{ body_html | safe }}
+    </article>
+
+    <aside class="bg-white border border-stone-200 rounded-md p-5 shadow-sm h-fit">
+      <h3 class="text-sm uppercase tracking-wider text-stone-500 mb-3">Metadata</h3>
+
+      <dl class="text-sm space-y-3">
+        <div>
+          <dt class="font-semibold text-stone-700">Title</dt>
+          <dd class="text-stone-900">{{ record.title }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-stone-700">Slug</dt>
+          <dd class="text-stone-600 font-mono text-xs">{{ record.slug }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-stone-700">Document types</dt>
+          <dd class="mt-1 flex flex-wrap gap-1">
+            {% if record.predominant_doc_types %}
+              {% for t in record.predominant_doc_types %}
+                <span class="inline-block text-xs bg-stone-100 text-stone-700 border border-stone-200 rounded-full px-2 py-0.5">
+                  {{ t }}
+                </span>
+              {% endfor %}
+            {% else %}
+              <span class="text-stone-500 italic">none</span>
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-stone-700">Source documents</dt>
+          <dd class="text-stone-900">{{ record.source_uri_count }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-stone-700">Version</dt>
+          <dd class="text-stone-900">v{{ record.version }}{% if record.is_stale %} (stale){% endif %}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-stone-700">Related pages</dt>
+          <dd class="mt-1">
+            {% if related %}
+              <ul class="space-y-1">
+                {% for r in related %}
+                  <li>
+                    <a href="/wiki/{{ r.slug }}" class="text-blue-700 hover:text-blue-900">
+                      {{ r.title }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="text-stone-500 italic">none</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </aside>
+  </div>
+{% endblock %}

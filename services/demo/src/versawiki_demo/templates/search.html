@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Search "{{ query }}" - Versawiki demo{% endblock %}
+{% block content %}
+  <header class="mb-6">
+    <h1 class="text-2xl font-semibold text-stone-800">
+      Search results{% if has_query %} for <span class="font-mono">"{{ query }}"</span>{% endif %}
+    </h1>
+    {% if has_query %}
+      <p class="text-stone-600 mt-1">
+        {{ cards | length }} match{{ '' if cards | length == 1 else 'es' }}.
+      </p>
+    {% else %}
+      <p class="text-stone-500 italic mt-1">Type a query in the search box above.</p>
+    {% endif %}
+  </header>
+
+  {% if has_query and not cards %}
+    <p class="text-stone-500 italic">No results matched.</p>
+  {% endif %}
+
+  {% if cards %}
+    <ul class="grid gap-4 md:grid-cols-2">
+      {% for card in cards %}
+        <li class="bg-white border border-stone-200 rounded-md p-4 shadow-sm hover:shadow transition">
+          <a href="/wiki/{{ card.slug }}" class="text-lg font-semibold text-blue-700 hover:text-blue-900">
+            {{ card.title }}
+          </a>
+          <p class="text-stone-700 text-sm mt-1">{{ card.summary }}</p>
+          {% if card.doc_types %}
+            <div class="mt-2 flex flex-wrap gap-1">
+              {% for t in card.doc_types %}
+                <span class="inline-block text-xs bg-stone-100 text-stone-700 border border-stone-200 rounded-full px-2 py-0.5">
+                  {{ t }}
+                </span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

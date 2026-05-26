@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "versawiki-demo"
+version = "0.1.0"
+description = "Versawiki local-folder demo runner: ingests a folder and serves a browsable wiki."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Versawiki team" }]
+
+# Demo is the only place allowed to import from BOTH the api and the
+# ingestion services. Path-deps via `[tool.uv.sources]` below so `uv sync`
+# picks up the sibling packages without publishing them.
+dependencies = [
+    "versawiki-api",
+    "versawiki-ingestion",
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.30,<0.40",
+    "jinja2>=3.1,<4",
+    "markdown-it-py>=3.0,<4",
+    "typer>=0.12,<1",
+    "httpx>=0.27,<0.29",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "httpx>=0.27,<0.29",
+]
+dev = [
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+]
+
+[project.scripts]
+versawiki-demo = "versawiki_demo.cli:app"
+
+[tool.uv.sources]
+versawiki-api = { path = "../api", editable = true }
+versawiki-ingestion = { path = "../ingestion", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+versawiki_demo = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
